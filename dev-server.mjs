@@ -38,11 +38,6 @@ http.createServer(async (req, res) => {
       const r = await onRequestGet({ request: new Request(url) });
       res.writeHead(r.status, Object.fromEntries(r.headers)); return res.end(await r.text());
     }
-    if (url.pathname === '/api/tr') {
-      const t = url.searchParams.get('t');
-      res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
-      return res.end(JSON.stringify(t ? { zh: '（模拟译文）' + t.length + '字的韩文标题' } : { ai: false }));
-    }
     if (url.pathname === '/' || url.pathname === '/index.html') {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); return res.end(await readFile(root + 'index.html'));
     }
