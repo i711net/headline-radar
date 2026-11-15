@@ -109,10 +109,23 @@ export function parseDate(raw, tz) {
   return t;
 }
 
+// 不算头条的条目：图片稿、讣告、栏目页、记者主页、专栏副刊、广告，以及语言不对的标题
+const JUNK = /^[\[［【(（]\s*(사진|포토|화보|부고|인사|표|쇼츠|영상|게시판|알림|運勢|星座)[^\]］】)）]*[\]］】)）]|^분야별 뉴스$|^.{2,8}\s(기자|앵커|라이브|특파원)$|다시보기$|作家專欄|副刊|短信推|之家$|^(Home|首頁|首页)$/i;
+export function keep(title, lang) {
+  if (JUNK.test(title)) return false;
+  const chars = [...title.replace(/[\s\d\p{P}\p{S}]/gu, '')];
+  if (chars.length < 5) return false;
+  const re = lang === 'ko' ? /[\uac00-\ud7a3]/ : /[\u4e00-\u9fff]/;
+  const share = chars.filter((c) => re.test(c)).length / chars.length;
+  if (share < (lang === 'ko' ? 0.3 : 0.4)) return false;            // 英文等其他语言的标题
+  if (/[\u3040-\u30ff]/.test(title)) return false;                  // 日文
+  return true;
+}
+
 export function parseFeed(xml, feed, now = Date.now()) {
   const blocks = xml.match(/<(item|entry)(?:\s[^>]*)?>[\s\S]*?<\/\1>/gi) || [];
   const out = [];
-  const why = { found: blocks.length, noDate: 0, old: 0 };
+  const why = { found: blocks.length, noDate: 0, old: 0, junk: 0 };
   for (const b of blocks.slice(0, MAX_PER_FEED)) {
     let title = clean(tag(b, ['title']));
     if (!title) continue;
@@ -135,6 +148,9 @@ export function parseFeed(xml, feed, now = Date.now()) {
         if (title.endsWith(suffix)) title = title.slice(0, -suffix.length).trim();
       }
     }
+    const rawTitle = title;
+    title = title.replace(/\s+-\s+\d{8}\s+-\s+.*$/, '').trim();   // 明报：标题 - 20261115 - 栏目 - 每日明报
+    if (JUNK.test(rawTitle) || !keep(title, feed.lang)) { why.junk++; continue; }
     let desc = feed.agg ? '' : clean(tag(b, ['description', 'summary', 'content:encoded'])).slice(0, 160);
     if (desc === title) desc = '';
     out.push({ title, link, ts, src, via, lang: feed.lang, region: feed.region, feed: feed.id, desc });
@@ -170,7 +186,7 @@ async function loadFeed(feed, now) {
     catch { xml = new TextDecoder('utf-8').decode(buf); }
     const items = parseFeed(xml, feed, now);
     const w = items.why;
-    const note = items.length ? null : !w.found ? '返回内容里没有新闻条目' : w.sameTime ? '发布时间无效（全部相同）' : w.noDate ? '条目没有发布时间' : w.old ? '条目都超过72小时' : '条目为空';
+    const note = items.length ? null : !w.found ? '返回内容里没有新闻条目' : w.sameTime ? '发布时间无效（全部相同）' : w.noDate ? '条目没有发布时间' : w.old ? '条目都超过72小时' : w.junk ? '条目都被过滤（非头条或语言不符）' : '条目为空';
     return { meta: status(feed, true, items, Date.now() - started, note), items };
   } catch (e) {
     const msg = e?.name === 'AbortError' ? '超时' : String(e?.message || e).slice(0, 80);
