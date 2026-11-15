@@ -36,6 +36,12 @@ button,select,input{font:inherit;color:inherit}
 .seg button[aria-pressed=true]{background:var(--ink);color:var(--panel)}
 .btn{border:1px solid var(--rule);background:var(--panel);border-radius:8px;padding:7px 12px;cursor:pointer}
 .btn:hover{border-color:var(--mute)}
+.dl{position:relative}.dl summary{list-style:none;cursor:pointer}.dl summary::-webkit-details-marker{display:none}
+.dl .menu{position:absolute;right:0;top:calc(100% + 6px);z-index:5;width:290px;background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:6px;box-shadow:0 8px 24px rgba(16,24,40,.16)}
+.dl .menu button{display:block;width:100%;text-align:left;border:0;background:none;padding:9px 10px;border-radius:7px;cursor:pointer;font-weight:600}
+.dl .menu button:hover{background:var(--page)}
+.dl .menu small{display:block;font-weight:400;color:var(--mute);font-size:12.5px}
+.dl .menu p{margin:6px 10px 6px;color:var(--mute);font-size:12.5px}
 .stamp{color:var(--mute);font-size:12.5px}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--down);margin-right:6px;vertical-align:1px}
 .dot.busy{background:var(--warn);animation:blink 1s infinite}
@@ -134,6 +140,12 @@ td.r,th.r{text-align:right}
       <button data-win="48" aria-pressed="false">近48小时</button>
     </div>
     <button class="btn" id="refresh">立即刷新</button>
+    <details class="dl" id="dl"><summary class="btn">下载</summary><div class="menu">
+      <button data-dl="csv">Excel 表格（CSV）<small>全部字段，适合筛选和统计</small></button>
+      <button data-dl="doc">Word 文档<small>指标摘要加头条，每个话题单独起页</small></button>
+      <button data-dl="pdf">打印或另存为 PDF<small>版式同 Word，在打印窗口选“另存为 PDF”</small></button>
+      <p>下载的是当前周期和当前筛选条件下的头条。</p>
+    </div></details>
     <span class="stamp"><span class="dot busy" id="dot"></span><span id="stamp">正在抓取各媒体新闻源…</span></span>
   </div>
 </div>
@@ -477,13 +489,16 @@ function renderSrc() {
   const ok = SOURCES.filter((s) => s.ok && s.count).length;
   $('#srcNote').textContent = SOURCES.length ? `${SOURCES.length} 个新闻源，本轮 ${ok} 个有内容` : '';
   $('#src').innerHTML = SOURCES.length ? `<table><thead><tr><th>新闻源</th><th>地区</th><th>状态</th><th class="r">条数</th><th class="r">耗时</th><th class="r">最新一条</th></tr></thead><tbody>` + SOURCES.map((s) =>
-    `<tr><td><span class="chip ${s.lang}">${LANG[s.lang]}</span> ${esc(s.name)}</td><td>${esc(s.region)}</td><td>${s.ok ? (s.count ? '<span class="ok">✓ 正常</span>' : '<span class="note">✓ 无近期条目</span>') : `<span class="bad">✕ ${esc(s.error || '失败')}</span>`}</td><td class="r num">${s.count}</td><td class="r num">${(s.ms / 1000).toFixed(1)}秒</td><td class="r num">${s.newest ? hm(s.newest) : '—'}</td></tr>`).join('') + '</tbody></table>' : '<p class="note">还没有拿到新闻源状态。</p>';
+    `<tr><td><span class="chip ${s.lang}">${LANG[s.lang]}</span> ${esc(s.name)}</td><td>${esc(s.region)}</td><td>${s.ok ? (s.count ? '<span class="ok">✓ 正常</span>' : `<span class="note">${esc(s.error || '无近期条目')}</span>`) : `<span class="bad">✕ ${esc(s.error || '失败')}</span>`}</td><td class="r num">${s.count}</td><td class="r num">${(s.ms / 1000).toFixed(1)}秒</td><td class="r num">${s.newest ? hm(s.newest) : '—'}</td></tr>`).join('') + '</tbody></table>' : '<p class="note">还没有拿到新闻源状态。</p>';
 }
 
 /* ---------- 时间线 ---------- */
-function renderTl(A) {
+function filtered(A) {
   const lang = $('#fLang').value, topic = $('#fTopic').value, region = $('#fRegion').value, q = $('#fQ').value.trim().toLowerCase(), qs = q && t2s(q);
-  const L = A.W.filter((i) => (!lang || i.lang === lang) && (!topic || i.topic === topic) && (!region || i.region === region) && (!q || i.n.toLowerCase().includes(qs) || i.title.toLowerCase().includes(q) || i.src.toLowerCase().includes(q)));
+  return A.W.filter((i) => (!lang || i.lang === lang) && (!topic || i.topic === topic) && (!region || i.region === region) && (!q || i.n.toLowerCase().includes(qs) || i.title.toLowerCase().includes(q) || i.src.toLowerCase().includes(q)));
+}
+function renderTl(A) {
+  const L = filtered(A);
   $('#tlNote').textContent = `${L.length} 条，按发布时间从新到旧`;
   if (!L.length) { $('#tl').innerHTML = `<div class="empty">${A.W.length ? '没有符合筛选条件的头条，换个条件试试。' : '这个周期里还没有头条。可以切换到“近24小时”，或稍后刷新。'}</div>`; return; }
   let html = '', cur = null;
@@ -525,6 +540,49 @@ document.addEventListener('click', (e) => {
   const k = e.target.closest('.kw');
   if (k) { $('#fQ').value = k.dataset.kw; LIMIT = 120; renderTl(LAST); document.body.dataset.view = 'tl'; for (const x of document.querySelectorAll('.tabs button')) x.setAttribute('aria-pressed', x.dataset.view === 'tl'); $('.tl').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 });
+/* ---------- 下载 ---------- */
+const ymd = (t) => { const d = new Date(t); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+const WINNAME = { today: '今日', 24: '近24小时', 48: '近48小时' };
+function saveFile(name, mime, text) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: mime })); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+function reportHtml(A, L) {
+  const tiles = [...document.querySelectorAll('.tile')].map((t) => `<tr><td>${esc(t.querySelector('.k').textContent)}</td><td><b>${esc(t.querySelector('.v').textContent)}</b></td><td>${esc(t.querySelector('.d').textContent)}</td></tr>`).join('');
+  const names = [...TOPICS.map((t) => t.name), '其他'].filter((n) => L.some((i) => i.topic === n));
+  const sections = names.map((n, k) => {
+    const rows = L.filter((i) => i.topic === n);
+    return `<h2 ${k ? '' : 'class="first"'}>${n}（${rows.length} 条）</h2><table><thead><tr><th style="width:15%">发布时间</th><th style="width:6%">语言</th><th>标题</th><th style="width:20%">媒体</th></tr></thead><tbody>` +
+      rows.map((i) => `<tr><td>${ymd(i.ts).slice(5)} ${hm(i.ts)}</td><td>${LANG[i.lang]}</td><td><a href="${esc(i.link)}">${esc(i.title)}</a></td><td>${esc(i.src)}（${esc(i.region)}）</td></tr>`).join('') + '</tbody></table>';
+  }).join('');
+  return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>头条雷达 ${ymd(A.b)}</title><style>
+  @page{size:A4;margin:18mm 15mm}body{font-family:"Microsoft YaHei","PingFang SC","Malgun Gothic",sans-serif;font-size:10.5pt;color:#111;line-height:1.5}
+  h1{font-size:20pt;margin:0 0 4pt}h2{font-size:14pt;margin:0 0 6pt;page-break-before:always}h2.first{page-break-before:auto;margin-top:14pt}
+  table{width:100%;border-collapse:collapse;margin-bottom:10pt}th,td{border:1px solid #bbb;padding:3pt 5pt;text-align:left;vertical-align:top}th{background:#eee}
+  a{color:#111;text-decoration:none}p{margin:0 0 8pt;color:#444}tr{page-break-inside:avoid}</style></head><body>
+  <h1>头条雷达：全球中文与韩文媒体头条</h1>
+  <p>统计周期：${WINNAME[WIN]}（${ymd(A.a)} ${hm(A.a)} 至 ${ymd(A.b)} ${hm(A.b)}），共 ${L.length} 条。导出时间 ${ymd(Date.now())} ${hm(Date.now())}。情绪与紧张指数为词表估算。</p>
+  <table><thead><tr><th>指标</th><th>数值</th><th>说明</th></tr></thead><tbody>${tiles}</tbody></table>${sections}</body></html>`;
+}
+$('#dl').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-dl]'); if (!b || !LAST) return;
+  const A = LAST, L = filtered(A), base = `头条雷达_${ymd(A.b)}_${WINNAME[WIN]}`;
+  if (b.dataset.dl === 'csv') {
+    const q = (v) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+    const rows = [['发布时间', '语言', '话题', '标题', '媒体', '地区', '情绪', '含风险词', '链接'], ...L.map((i) => [ymd(i.ts) + ' ' + hm(i.ts), i.lang === 'zh' ? '中文' : '韩文', i.topic, i.title, i.src, i.region, i.sent > 0 ? '正面' : i.sent < 0 ? '负面' : '中性', i.tense ? '是' : '否', i.link])];
+    saveFile(base + '.csv', 'text/csv;charset=utf-8', '\ufeff' + rows.map((r) => r.map(q).join(',')).join('\r\n'));
+  } else if (b.dataset.dl === 'doc') {
+    saveFile(base + '.doc', 'application/msword', '\ufeff' + reportHtml(A, L));
+  } else {
+    let f = $('#printFrame'); if (f) f.remove();
+    f = document.createElement('iframe'); f.id = 'printFrame'; f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+    document.body.appendChild(f); f.contentDocument.open(); f.contentDocument.write(reportHtml(A, L)); f.contentDocument.close();
+    setTimeout(() => { f.contentWindow.focus(); f.contentWindow.print(); }, 300);
+  }
+  $('#dl').open = false;
+});
+document.addEventListener('click', (e) => { if (!e.target.closest('#dl')) $('#dl').open = false; });
+
 const tip = $('#tip');
 function showTip(el, x, y) { tip.textContent = el.dataset.tip; tip.style.display = 'block'; const r = tip.getBoundingClientRect(); tip.style.left = Math.max(6, Math.min(innerWidth - r.width - 6, x + 12)) + 'px'; tip.style.top = Math.max(6, Math.min(innerHeight - r.height - 6, y + 14)) + 'px'; }
 document.addEventListener('pointermove', (e) => { const el = e.target.closest?.('[data-tip]'); if (el) showTip(el, e.clientX, e.clientY); else tip.style.display = 'none'; });

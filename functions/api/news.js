@@ -5,6 +5,10 @@
 
 const G = (hl, gl, ceid) => `https://news.google.com/rss?hl=${hl}&gl=${gl}&ceid=${ceid}`;
 
+// 没有可用 RSS 的媒体，改用 Google 新闻按站点检索最近一天的报道（带发布时间和媒体名）
+const S = (site, hl, gl, ceid) => `https://news.google.com/rss/search?q=site:${site}+when:1d&hl=${hl}&gl=${gl}&ceid=${ceid}`;
+const CN = ['zh-CN', 'CN', 'CN:zh-Hans'], TW = ['zh-TW', 'TW', 'TW:zh-Hant'], HK = ['zh-HK', 'HK', 'HK:zh-Hant'], KR = ['ko', 'KR', 'KR:ko'];
+
 // lang: zh | ko      region: 媒体所在地区      tz: 源里日期不带时区时的默认时差（小时）
 // agg: true 表示聚合源（Google 新闻头条），条目里的 <source> 才是真正的媒体名
 export const FEEDS = [
@@ -18,21 +22,26 @@ export const FEEDS = [
 
   // ---------- 中文 · 媒体直连 ----------
   { id: 'chinanews', name: '中国新闻网', lang: 'zh', region: '中国大陆', tz: 8, url: 'https://www.chinanews.com.cn/rss/scroll-news.xml' },
-  { id: 'people', name: '人民网', lang: 'zh', region: '中国大陆', tz: 8, url: 'http://www.people.com.cn/rss/politics.xml' },
   { id: 'ftchinese', name: 'FT中文网', lang: 'zh', region: '国际', tz: 8, url: 'https://www.ftchinese.com/rss/news' },
   { id: 'bbc-zh', name: 'BBC中文', lang: 'zh', region: '国际', url: 'https://feeds.bbci.co.uk/zhongwen/simp/rss.xml' },
   { id: 'nyt-zh', name: '纽约时报中文网', lang: 'zh', region: '国际', url: 'https://cn.nytimes.com/rss/' },
   { id: 'dw-zh', name: '德国之声中文', lang: 'zh', region: '国际', url: 'https://rss.dw.com/rdf/rss-chi-all' },
   { id: 'rfi-zh', name: '法广中文', lang: 'zh', region: '国际', url: 'https://www.rfi.fr/cn/rss' },
-  { id: 'wsj-zh', name: '华尔街日报中文网', lang: 'zh', region: '国际', url: 'https://cn.wsj.com/zh-hans/rss' },
-  { id: 'nikkei-zh', name: '日经中文网', lang: 'zh', region: '国际', tz: 8, url: 'https://cn.nikkei.com/rss.html' },
   { id: 'yna-zh', name: '韩联社中文', lang: 'zh', region: '韩国', tz: 9, url: 'https://cn.yna.co.kr/RSS/news.xml' },
   { id: 'cna', name: '中央社', lang: 'zh', region: '台湾', tz: 8, url: 'https://feeds.feedburner.com/rsscna/politics' },
   { id: 'ltn', name: '自由时报', lang: 'zh', region: '台湾', tz: 8, url: 'https://news.ltn.com.tw/rss/all.xml' },
-  { id: 'udn', name: '联合新闻网', lang: 'zh', region: '台湾', tz: 8, url: 'https://udn.com/rssfeed/news/2/6638?ch=news' },
   { id: 'rthk', name: '香港电台', lang: 'zh', region: '香港', tz: 8, url: 'https://rthk.hk/rthk/news/rss/c_expressnews_clocal.xml' },
   { id: 'rthk-intl', name: '香港电台·国际', lang: 'zh', region: '香港', tz: 8, url: 'https://rthk.hk/rthk/news/rss/c_expressnews_cinternational.xml' },
-  { id: 'mingpao', name: '明报', lang: 'zh', region: '香港', tz: 8, url: 'https://news.mingpao.com/rss/pns/s00001.xml' },
+
+  // ---------- 中文 · 按站点检索 ----------
+  { id: 's-people', name: '人民网', lang: 'zh', region: '中国大陆', agg: true, fixed: true, url: S('people.com.cn', ...CN) },
+  { id: 's-xinhua', name: '新华网', lang: 'zh', region: '中国大陆', agg: true, fixed: true, url: S('news.cn', ...CN) },
+  { id: 's-thepaper', name: '澎湃新闻', lang: 'zh', region: '中国大陆', agg: true, fixed: true, url: S('thepaper.cn', ...CN) },
+  { id: 's-caixin', name: '财新', lang: 'zh', region: '中国大陆', agg: true, fixed: true, url: S('caixin.com', ...CN) },
+  { id: 's-zaobao', name: '联合早报', lang: 'zh', region: '新加坡', agg: true, fixed: true, url: S('zaobao.com.sg', ...CN) },
+  { id: 's-udn', name: '联合新闻网', lang: 'zh', region: '台湾', agg: true, fixed: true, url: S('udn.com', ...TW) },
+  { id: 's-mingpao', name: '明报', lang: 'zh', region: '香港', agg: true, fixed: true, url: S('mingpao.com', ...HK) },
+  { id: 's-hk01', name: '香港01', lang: 'zh', region: '香港', agg: true, fixed: true, url: S('hk01.com', ...HK) },
 
   // ---------- 韩文 · 聚合头条 ----------
   { id: 'g-kr', name: 'Google 뉴스·한국 헤드라인', lang: 'ko', region: '韩国', agg: true, url: G('ko', 'KR', 'KR:ko') },
@@ -41,21 +50,24 @@ export const FEEDS = [
   { id: 'yna', name: '연합뉴스 韩联社', lang: 'ko', region: '韩国', tz: 9, url: 'https://www.yna.co.kr/rss/news.xml' },
   { id: 'chosun', name: '조선일보 朝鲜日报', lang: 'ko', region: '韩国', tz: 9, url: 'https://www.chosun.com/arc/outboundfeeds/rss/?outputType=xml' },
   { id: 'donga', name: '동아일보 东亚日报', lang: 'ko', region: '韩国', tz: 9, url: 'https://rss.donga.com/total.xml' },
-  { id: 'hani', name: '한겨레 韩民族日报', lang: 'ko', region: '韩国', tz: 9, url: 'https://www.hani.co.kr/rss/' },
   { id: 'khan', name: '경향신문 京乡新闻', lang: 'ko', region: '韩国', tz: 9, url: 'https://www.khan.co.kr/rss/rssdata/total_news.xml' },
   { id: 'mk', name: '매일경제 每日经济', lang: 'ko', region: '韩国', tz: 9, url: 'https://www.mk.co.kr/rss/30000001/' },
   { id: 'hankyung', name: '한국경제 韩国经济', lang: 'ko', region: '韩国', tz: 9, url: 'https://www.hankyung.com/feed/all-news' },
   { id: 'sbs', name: 'SBS 뉴스', lang: 'ko', region: '韩国', tz: 9, url: 'https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=01&plink=RSSREADER' },
-  { id: 'jtbc', name: 'JTBC 뉴스', lang: 'ko', region: '韩国', tz: 9, url: 'https://fs.jtbc.co.kr/RSS/newsflash.xml' },
   { id: 'nocut', name: '노컷뉴스 CBS', lang: 'ko', region: '韩国', tz: 9, url: 'https://rss.nocutnews.co.kr/nocutnews.xml' },
   { id: 'seoul', name: '서울신문 首尔新闻', lang: 'ko', region: '韩国', tz: 9, url: 'https://www.seoul.co.kr/xml/rss/google_top.xml' },
   { id: 'segye', name: '세계일보 世界日报', lang: 'ko', region: '韩国', tz: 9, url: 'https://www.segye.com/Articles/RSSList/segye_recent.xml' },
-  { id: 'kmib', name: '국민일보 国民日报', lang: 'ko', region: '韩国', tz: 9, url: 'https://rss.kmib.co.kr/data/kmibRssAll.xml' },
+  // ---------- 韩文 · 按站点检索 ----------
+  { id: 's-hani', name: '한겨레 韩民族日报', lang: 'ko', region: '韩国', agg: true, fixed: true, url: S('hani.co.kr', ...KR) },
+  { id: 's-joongang', name: '중앙일보 中央日报', lang: 'ko', region: '韩国', agg: true, fixed: true, url: S('joongang.co.kr', ...KR) },
+  { id: 's-hankook', name: '한국일보 韩国日报', lang: 'ko', region: '韩国', agg: true, fixed: true, url: S('hankookilbo.com', ...KR) },
+  { id: 's-kmib', name: '국민일보 国民日报', lang: 'ko', region: '韩国', agg: true, fixed: true, url: S('kmib.co.kr', ...KR) },
+  { id: 's-jtbc', name: 'JTBC 뉴스', lang: 'ko', region: '韩国', agg: true, fixed: true, url: S('news.jtbc.co.kr', ...KR) },
 ];
 
 const CACHE_SECONDS = 300;
 const FETCH_TIMEOUT_MS = 7000;
-const MAX_PER_FEED = 80;
+const MAX_PER_FEED = 100;
 const MAX_AGE_HOURS = 72;
 
 const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', middot: '·', hellip: '…', ldquo: '“', rdquo: '”', lsquo: '‘', rsquo: '’', mdash: '—', ndash: '–' };
@@ -100,6 +112,7 @@ export function parseDate(raw, tz) {
 export function parseFeed(xml, feed, now = Date.now()) {
   const blocks = xml.match(/<(item|entry)(?:\s[^>]*)?>[\s\S]*?<\/\1>/gi) || [];
   const out = [];
+  const why = { found: blocks.length, noDate: 0, old: 0 };
   for (const b of blocks.slice(0, MAX_PER_FEED)) {
     let title = clean(tag(b, ['title']));
     if (!title) continue;
@@ -110,14 +123,14 @@ export function parseFeed(xml, feed, now = Date.now()) {
     }
     if (!link) link = clean(tag(b, ['guid', 'id']));
     const ts = parseDate(tag(b, ['pubDate', 'dc:date', 'published', 'updated', 'date']), feed.tz);
-    if (!Number.isFinite(ts)) continue;            // 没有发布时间的条目无法按时间排序，丢弃
+    if (!Number.isFinite(ts)) { why.noDate++; continue; }            // 没有发布时间的条目无法按时间排序，丢弃
     if (ts > now + 10 * 60000) continue;           // 时间在未来，源数据有误
-    if (now - ts > MAX_AGE_HOURS * 3600000) continue;
+    if (now - ts > MAX_AGE_HOURS * 3600000) { why.old++; continue; }
     let src = feed.name, via = null;
     if (feed.agg) {
       const s = clean(tag(b, ['source']));
       if (s) {
-        src = s; via = feed.name;
+        if (feed.fixed) { src = feed.name; via = 'Google新闻'; } else { src = s; via = feed.name; }
         const suffix = ' - ' + s;
         if (title.endsWith(suffix)) title = title.slice(0, -suffix.length).trim();
       }
@@ -126,6 +139,9 @@ export function parseFeed(xml, feed, now = Date.now()) {
     if (desc === title) desc = '';
     out.push({ title, link, ts, src, via, lang: feed.lang, region: feed.region, feed: feed.id, desc });
   }
+  // 所有条目的时间完全一样，说明这个源给的不是真实发布时间
+  if (out.length >= 5 && out.every((i) => i.ts === out[0].ts)) { why.sameTime = true; out.length = 0; }
+  out.why = why;
   return out;
 }
 
@@ -153,7 +169,9 @@ async function loadFeed(feed, now) {
     try { xml = new TextDecoder((charset || 'utf-8').toLowerCase()).decode(buf); }
     catch { xml = new TextDecoder('utf-8').decode(buf); }
     const items = parseFeed(xml, feed, now);
-    return { meta: status(feed, true, items, Date.now() - started), items };
+    const w = items.why;
+    const note = items.length ? null : !w.found ? '返回内容里没有新闻条目' : w.sameTime ? '发布时间无效（全部相同）' : w.noDate ? '条目没有发布时间' : w.old ? '条目都超过72小时' : '条目为空';
+    return { meta: status(feed, true, items, Date.now() - started, note), items };
   } catch (e) {
     const msg = e?.name === 'AbortError' ? '超时' : String(e?.message || e).slice(0, 80);
     return { meta: status(feed, false, [], Date.now() - started, msg), items: [] };
