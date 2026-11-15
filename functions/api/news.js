@@ -113,7 +113,7 @@ export function parseDate(raw, tz) {
 }
 
 // 不算头条的条目：图片稿、讣告、栏目页、记者主页、专栏副刊、广告，以及语言不对的标题
-const JUNK = /^[\[［【(（]\s*(사진|포토|화보|부고|인사|표|쇼츠|영상|게시판|알림|運勢|星座)[^\]］】)）]*[\]］】)）]|^분야별 뉴스$|^.{2,8}\s(기자|앵커|라이브|특파원)$|다시보기$|作家專欄|副刊|短信推|之家$|头条抢鲜看|^FT ?金融时报$|分類廣告|分类广告|^(Home|首頁|首页)$/i;
+const JUNK = /^[\[［【(（]\s*(사진|포토|화보|부고|인사|표|쇼츠|영상|게시판|알림|運勢|星座)[^\]］】)）]*[\]］】)）]|^분야별 뉴스$|^.{2,8}\s(기자|앵커|라이브|특파원)$|다시보기$|作家專欄|副刊|短信推|之家$|[-|｜]\s*(言路|社论|社論|专栏|專欄|名家|观点|觀點|读者来函|讀者投書)\s*$|部落格|的圖文世界|이 시각 헤드라인|헤드라인\]|^最新.{0,6}(周刊|新闻|新聞)|^看好文|头条抢鲜看|^FT ?金融时报$|分類廣告|分类广告|^(Home|首頁|首页)$/i;
 export function keep(title, lang) {
   if (JUNK.test(title)) return false;
   const chars = [...title.replace(/[\s\d\p{P}\p{S}]/gu, '')];
@@ -150,6 +150,7 @@ export function parseFeed(xml, feed, now = Date.now()) {
     if (feed.agg) {
       const s = clean(tag(b, ['source']));
       if (s) {
+        if (/部落格|blog|周刊|週刊|電子報|电子报|分類廣告|vibes/i.test(s)) { why.junk++; continue; }   // 博客、周刊目录、广告子站
         if (feed.fixed) { src = feed.name; via = 'Google新闻'; } else { src = ALIAS[s] || s; via = feed.name; }
         const suffix = ' - ' + s;
         if (title.endsWith(suffix)) title = title.slice(0, -suffix.length).trim();
