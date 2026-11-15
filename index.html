@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>头条雷达 · 全球中文与韩文媒体当日头条</title>
+<meta name="description" content="自动收集全球中文、韩文媒体当日头条，按发布时间排列，并给出发稿速度、热度、情绪、集中度等分析指标。">
+<style>
+:root{
+  color-scheme:light;
+  --page:#eef1f4; --panel:#fcfcfb; --ink:#16202e; --ink2:#465264; --mute:#6b7686; --rule:#d8dde4; --rule2:#e8ebef;
+  --zh:#eb6834; --ko:#2a78d6; --up:#cf3a3a; --down:#0a8a66; --warn:#b26a00; --hl:#fff3c4;
+  --serif:"Songti SC","Noto Serif CJK SC","Source Han Serif SC","Noto Serif SC","AppleMyungjo","Batang",SimSun,serif;
+  --sans:system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Apple SD Gothic Neo","Malgun Gothic","Noto Sans CJK SC",sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{color-scheme:dark;--page:#12161c;--panel:#1a1f27;--ink:#eef0f3;--ink2:#c2c8d1;--mute:#939cab;--rule:#333b47;--rule2:#272e38;
+    --zh:#d95926;--ko:#3987e5;--up:#e66767;--down:#2fb38c;--warn:#d9a13a;--hl:#4a4320;}
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--page);color:var(--ink);font:14px/1.55 var(--sans);-webkit-text-size-adjust:100%}
+a{color:inherit;text-decoration:none}
+a:hover{text-decoration:underline}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--ko);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+
+/* 报头 */
+.mast{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 28px;padding:22px clamp(14px,3vw,36px) 14px}
+.mast h1{font:700 clamp(30px,4.6vw,46px)/1 var(--serif);letter-spacing:.04em;margin:0}
+.mast .sub{color:var(--ink2);margin:6px 0 0;max-width:46em}
+.mast .right{margin-left:auto;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:8px;overflow:hidden;background:var(--panel)}
+.seg button{border:0;background:none;padding:7px 12px;cursor:pointer;color:var(--ink2)}
+.seg button[aria-pressed=true]{background:var(--ink);color:var(--panel)}
+.btn{border:1px solid var(--rule);background:var(--panel);border-radius:8px;padding:7px 12px;cursor:pointer}
+.btn:hover{border-color:var(--mute)}
+.stamp{color:var(--mute);font-size:12.5px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--down);margin-right:6px;vertical-align:1px}
+.dot.busy{background:var(--warn);animation:blink 1s infinite}
+.dot.err{background:var(--up)}
+@keyframes blink{50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.dot.busy{animation:none}}
+
+/* 指数带 */
+.tape{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(150px,1fr);overflow-x:auto;background:var(--ink);color:#f3f5f7;scrollbar-width:thin}
+@media (prefers-color-scheme:dark){.tape{background:#0b0e12}}
+.tile{padding:14px 16px 12px;border-right:1px solid rgba(255,255,255,.12);min-width:0;cursor:help}
+.tile .k{font-size:12.5px;color:#b9c1cc;white-space:nowrap}
+.tile .v{font:600 26px/1.15 var(--sans);margin:4px 0 2px;white-space:nowrap}
+.tile .v small{font-size:13px;font-weight:400;color:#b9c1cc;margin-left:3px}
+.tile .d{font-size:12.5px;color:#b9c1cc;white-space:nowrap}
+.tape .up{color:#ff8f8f}.tape .down{color:#5fd6b0}
+.up{color:var(--up)}.down{color:var(--down)}
+
+/* 主体 */
+.wrap{display:grid;grid-template-columns:minmax(340px,460px) 1fr;gap:18px;padding:18px clamp(14px,3vw,36px) 40px;align-items:start}
+.panel{background:var(--panel);border:1px solid var(--rule);border-radius:10px;min-width:0}
+.panel>header{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline;padding:13px 16px 9px;border-bottom:1px solid var(--rule2)}
+.panel h2{font:700 17px/1.3 var(--serif);margin:0}
+.panel .note{color:var(--mute);font-size:12.5px}
+.panel .body{padding:12px 16px 14px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.grid .wide{grid-column:1/-1}
+.tabs{display:none}
+
+/* 时间线 */
+.tl{position:sticky;top:12px;max-height:calc(100vh - 24px);display:flex;flex-direction:column}
+.filters{display:flex;flex-wrap:wrap;gap:8px;padding:10px 16px;border-bottom:1px solid var(--rule2)}
+.filters select,.filters input{border:1px solid var(--rule);background:var(--panel);border-radius:7px;padding:6px 8px;min-width:0}
+.filters input{flex:1 1 120px}
+.tl-list{overflow:auto;padding:0 0 8px}
+.hour{position:sticky;top:0;z-index:1;background:var(--page);border-block:1px solid var(--rule2);padding:5px 16px;font-size:12.5px;color:var(--ink2);display:flex;justify-content:space-between}
+.it{display:grid;grid-template-columns:46px 1fr;gap:10px;padding:10px 16px;border-bottom:1px solid var(--rule2)}
+.it time{color:var(--mute);font-size:13px;padding-top:2px}
+.it .t{font:600 15.5px/1.45 var(--serif)}
+.it[data-lang=ko] .t{font-family:"AppleMyungjo","Batang","Noto Serif CJK KR",var(--serif)}
+.it .m{color:var(--mute);font-size:12.5px;margin-top:3px;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center}
+.chip{display:inline-block;font-size:11.5px;line-height:1;padding:3px 6px;border-radius:4px;color:#fff}
+.chip.zh{background:var(--zh)}.chip.ko{background:var(--ko)}
+.tag{border:1px solid var(--rule);border-radius:4px;padding:1px 6px;font-size:11.5px;color:var(--ink2)}
+.more{display:block;margin:12px auto 6px}
+.empty{padding:28px 16px;color:var(--ink2)}
+
+/* 图表与榜单 */
+.legend{display:flex;gap:14px;font-size:12.5px;color:var(--ink2);margin-left:auto}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+svg text{font:11px var(--sans);fill:var(--mute)}
+table{width:100%;border-collapse:collapse}
+th{font-weight:400;color:var(--mute);font-size:12px;text-align:left;padding:4px 6px 6px}
+td{padding:6px;border-top:1px solid var(--rule2);vertical-align:middle}
+td.r,th.r{text-align:right}
+.bar{height:8px;border-radius:0 4px 4px 0;min-width:2px}
+.barl{height:8px;border-radius:4px 0 0 4px;min-width:2px;margin-left:auto}
+.kw{cursor:pointer;border:0;background:none;padding:0;font-weight:600;text-align:left}
+.kw:hover{text-decoration:underline}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.cols h3{font:600 13px var(--sans);margin:0 0 4px;color:var(--ink2)}
+.story{padding:9px 0;border-top:1px solid var(--rule2)}
+.story:first-child{border-top:0;padding-top:2px}
+.story .t{font:600 15px/1.45 var(--serif)}
+.story .m{font-size:12.5px;color:var(--mute);margin-top:2px}
+.heat{display:inline-block;min-width:34px;text-align:center;font-weight:700;border-radius:4px;padding:1px 5px;background:var(--hl);color:var(--ink);margin-right:8px;font-size:12.5px}
+.ok{color:var(--down)}.bad{color:var(--up)}
+#tip{position:fixed;z-index:9;pointer-events:none;background:var(--ink);color:var(--panel);padding:6px 9px;border-radius:6px;font-size:12.5px;line-height:1.5;max-width:260px;display:none;white-space:pre-line}
+.method{color:var(--ink2);font-size:13px;line-height:1.7}
+.method b{color:var(--ink)}
+.errbox{margin:18px clamp(14px,3vw,36px);padding:14px 16px;border:1px solid var(--up);border-radius:10px;background:var(--panel)}
+
+@media (max-width:1180px){.grid{grid-template-columns:1fr}}
+@media (max-width:860px){
+  .wrap{grid-template-columns:1fr}
+  .tabs{display:flex;margin:14px clamp(14px,3vw,36px) 0}
+  .tabs .seg{width:100%}.tabs button{flex:1}
+  body[data-view=tl] .grid,body[data-view=an] .tl{display:none}
+  .tl{position:static;max-height:none}
+  .cols{grid-template-columns:1fr}
+  .mast .right{margin-left:0}
+}
+</style>
+</head>
+<body data-view="tl">
+
+<div class="mast">
+  <div>
+    <h1>头条雷达</h1>
+    <p class="sub">自动收集全球中文与韩文媒体的当日头条，按发布时间排列，并实时计算发稿速度、热度、情绪、集中度等指标。</p>
+  </div>
+  <div class="right">
+    <div class="seg" role="group" aria-label="统计周期" id="winSeg">
+      <button data-win="today" aria-pressed="true">今日</button>
+      <button data-win="24" aria-pressed="false">近24小时</button>
+      <button data-win="48" aria-pressed="false">近48小时</button>
+    </div>
+    <button class="btn" id="refresh">立即刷新</button>
+    <span class="stamp"><span class="dot busy" id="dot"></span><span id="stamp">正在抓取各媒体新闻源…</span></span>
+  </div>
+</div>
+
+<div class="tape" id="tape" aria-label="核心指数"></div>
+<div id="err"></div>
+
+<div class="tabs"><div class="seg" role="group" aria-label="视图">
+  <button data-view="tl" aria-pressed="true">头条时间线</button><button data-view="an" aria-pressed="false">数据分析</button>
+</div></div>
+
+<div class="wrap">
+  <section class="panel tl" aria-label="头条时间线">
+    <header><h2>头条时间线</h2><span class="note" id="tlNote"></span></header>
+    <div class="filters">
+      <select id="fLang" aria-label="语言"><option value="">中文＋韩文</option><option value="zh">只看中文</option><option value="ko">只看韩文</option></select>
+      <select id="fTopic" aria-label="话题"><option value="">全部话题</option></select>
+      <select id="fRegion" aria-label="地区"><option value="">全部地区</option></select>
+      <input id="fQ" type="search" placeholder="搜索标题或媒体" aria-label="搜索">
+    </div>
+    <div class="tl-list" id="tl"></div>
+  </section>
+
+  <div class="grid">
+    <section class="panel wide"><header><h2>发稿节奏</h2><span class="note">每小时头条数量，折线为3小时移动平均</span>
+      <span class="legend"><span><i class="sw" style="background:var(--zh)"></i>中文</span><span><i class="sw" style="background:var(--ko)"></i>韩文</span><span><i class="sw" style="background:var(--ink);height:2px;vertical-align:3px"></i>3小时均线</span></span></header>
+      <div class="body"><div id="chart"></div></div></section>
+
+    <section class="panel wide"><header><h2>热点事件</h2><span class="note">多家媒体同时报道的同一件事，热度 = 报道媒体数 × 时效衰减</span></header>
+      <div class="body cols"><div><h3>中文媒体</h3><div id="stZh"></div></div><div><h3>韩文媒体</h3><div id="stKo"></div></div></div></section>
+
+    <section class="panel wide"><header><h2>关键词涨跌榜</h2><span class="note">标题高频词，涨跌为对比上一个同长度周期；点击词语可筛选时间线</span></header>
+      <div class="body cols"><div><h3>中文</h3><div id="kwZh"></div></div><div><h3>韩文</h3><div id="kwKo"></div></div></div></section>
+
+    <section class="panel"><header><h2>中韩共同关注</h2><span class="note">同一对象在两种语言头条里被提到的次数</span></header><div class="body" id="ent"></div></section>
+    <section class="panel"><header><h2>话题版图</h2><span class="note">各话题占该语言头条的比例</span></header><div class="body" id="topics"></div></section>
+    <section class="panel"><header><h2>媒体声量</h2><span class="note">头条条数占比最高的媒体</span></header><div class="body" id="sov"></div></section>
+    <section class="panel"><header><h2>标题体检</h2><span class="note">标题写法的统计特征</span></header><div class="body" id="fmt"></div></section>
+    <section class="panel wide"><header><h2>新闻源状态</h2><span class="note" id="srcNote"></span></header><div class="body" id="src" style="overflow-x:auto"></div></section>
+    <section class="panel wide"><header><h2>指标是怎么算的</h2></header><div class="body method">
+      <p><b>头条总量与环比</b>：所选周期内的头条条数，和紧挨着的上一个同长度周期比较。<b>发稿速度与动量</b>：最近3小时平均每小时条数，和再往前3小时比较。<b>热度指数</b>：把当前发稿速度换算成相对近24小时均值的标准分，50为平常水平，高于65偏热，低于35偏冷。<b>波动率</b>：每小时条数的标准差除以均值。</p>
+      <p><b>情绪指数</b>：用正面、负面词表给每条标题打分，（正面条数−负面条数）÷（两者之和）×100，范围−100到+100。<b>紧张指数</b>：标题含战争、制裁、事故、暴跌等风险词的比例。两者都是词表估算，只适合看方向，不代表对单条新闻的判断。</p>
+      <p><b>来源集中度（HHI）</b>：各媒体条数占比的平方和×10000，低于1500为分散，高于2500为集中；CR4是前四家媒体的合计占比。<b>话题多样性</b>：话题分布的归一化香农熵，1表示各话题完全均匀。<b>中韩共振度</b>：两种语言对同一批国家、人物、议题的提及向量的余弦相似度。</p>
+      <p>数据来自各媒体公开的RSS与各地区版Google新闻头条，每5分钟更新一次。新闻源一般只保留最近一段时间的条目，所以本页会把看过的头条存在你这台设备的浏览器里（最多保留72小时），打开得越久，环比和涨跌越准。</p>
+    </div></section>
+  </div>
+</div>
+<div id="tip" role="tooltip"></div>
+
+<script>
+'use strict';
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const H = 3600000;
+const pad = (n) => String(n).padStart(2, '0');
+const hm = (t) => { const d = new Date(t); return pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+const pct = (x, d = 0) => (x * 100).toFixed(d) + '%';
+const LANG = { zh: '中', ko: '韩' };
+
+/* ---------- 文本处理 ---------- */
+const T2S = {};
+('國国 會会 黨党 總总 統统 選选 舉举 華华 灣湾 臺台 韓韩 鮮鲜 聯联 軍军 戰战 爭争 彈弹 導导 發发 經经 濟济 貿贸 關关 稅税 幣币 匯汇 銀银 價价 漲涨 產产 業业 車车 電电 腦脑 網网 絡络 資资 訊讯 機机 術术 學学 醫医 藥药 療疗 檢检 測测 氣气 災灾 風风 颱台 環环 鐵铁 運运 動动 員员 賽赛 奧奥 億亿 萬万 與与 對对 於于 為为 這这 個个 們们 來来 時时 後后 將将 還还 進进 過过 現现 實实 開开 長长 門门 問问 題题 議议 談谈 訪访 說说 稱称 報报 記记 視视 調调 審审 訴诉 罰罚 殺杀 傷伤 獲获 獎奖 區区 縣县 鄉乡 鎮镇 島岛 東东 亞亚 歐欧 烏乌 蘭兰 紐纽 約约 倫伦 頓顿 買买 賣卖 數数 據据 雲云 圓圆 積积 體体 設设 備备 廠厂 權权 黃黄 龍龙 馬马 鳥鸟 魚鱼 預预 計计 劃划 際际 務务 處处 辦办 專专 勞劳 農农 糧粮 兒儿 婦妇 歲岁 無无 許许 認认 證证 護护 衛卫 隊队 艦舰 飛飞 襲袭 擊击 佔占 領领 離离 難难 壓压 險险 債债 貸贷 購购 併并 擴扩 縮缩 滿满 準准 確确 顯显 觀观 點点 緊紧 張张 變变 應应 響响 樓楼 層层 橋桥 輸输 連连 雙双 單单 創创 紀纪 錄录 歷历 屆届 類类 種种 質质 極极 強强 劇剧 樂乐 畫画 藝艺 遊游 戲戏 館馆 圖图 書书 讀读 語语 譯译 詞词 聲声 頭头 條条 則则 規规 範范 標标 項项 組组 織织 團团 結结 協协 簽签 訂订 讓让 請请 願愿 遷迁 歸归 屬属 歡欢 慶庆 節节 禮礼 喪丧 墜坠 毀毁 燒烧 滅灭 礦矿 煙烟 霧雾 溫温 熱热 濕湿 乾干 淨净 潔洁 汙污 塵尘 廢废 棄弃 棟栋 齡龄 輕轻 幫帮 夢梦 愛爱 親亲 鄰邻 鬥斗 惡恶 壞坏 邊边 遠远 遲迟 適适 遺遗 錢钱 鐘钟 鏡镜 針针 錯错 閉闭 閣阁 陸陆 陽阳 階阶 隨随 隱隐 雜杂 靈灵 靜靜 頁页 順顺 須须 顧顾 顆颗 額额 飯饭 飲饮 養养 餘余 駐驻 驗验 驚惊 髮发 鬆松 麗丽 麼么 齊齐 齒齿 參参 們们 僅仅 傳传 債债 優优 內内 兩两 冊册 凍冻 劉刘 劍剑 勝胜 勢势 啟启 嚴严 圍围 園园 執执 場场 壇坛 壯壮 夠够 奪夺 奮奋 孫孙 寶宝 層层 峽峡 廣广 彎弯 態态 憲宪 戶户 損损 擁拥 擬拟 攜携 敗败 斷断 曉晓 榮荣 歐欧 殘残 氫氢 決决 況况 淚泪 漢汉 潛潜 濱滨 爾尔 獨独 獻献 瑪玛 瘋疯 盜盗 盡尽 監监 礙碍 禍祸 稱称 穩稳 競竞 築筑 糾纠 紅红 級级 細细 終终 絕绝 給给 統统 維维 綠绿 線线 練练 總总 績绩 繼继 續续 罷罢 職职 聞闻 脫脱 興兴 舊旧 莊庄 蘇苏 處处 號号 補补 裝装 複复 襲袭 訓训 設设 評评 試试 詢询 誤误 課课 請请 論论 諾诺 謝谢 講讲 譽誉 變变 讚赞 豐丰 貧贫 貨货 責责 貴贵 費费 賀贺 賓宾 質质 贈赠 贊赞 趙赵 躍跃 軌轨 軟软 較较 載载 輛辆 輝辉 輪轮 轉转 農农 迴回 郵邮 釋释 鋼钢 錦锦 鍵键 鎖锁 鑑鉴 閱阅 闆板 闖闯 陣阵 陳陈 險险 雖虽 雞鸡 電电 頻频 顏颜 飆飙 餐餐 驅驱 騙骗 鬧闹 鴻鸿 鹽盐 麥麦 黑黑 齋斋').split(' ').forEach((p) => { T2S[p[0]] = p[1]; });
+const t2s = (s) => s.replace(/[一-鿿]/g, (c) => T2S[c] || c);
+
+const STOP_ZH = new Set('什么 怎么 如何 为何 为什么 一个 一些 没有 可以 这个 那个 我们 他们 你们 自己 已经 还是 就是 不是 但是 因为 所以 如果 以及 对于 关于 通过 进行 表示 认为 指出 称为 今日 今天 昨日 明天 目前 现在 最新 消息 新闻 报道 记者 媒体 视频 图片 直播 快讯 专访 评论 观察 分析 解读 回应 发布 宣布 举行 召开 出席 相关 有关 其中 之后 之前 以来 期间 方面 问题 情况 工作 活动 继续 开始 可能 需要 成为 或将 将在 一次 首次 再次 持续 多名 多人 人士 网友 日电 中新网 人民网 新华社 一年 今年 明年 去年 上午 下午 凌晨 时间 小时 分钟'.split(' '));
+const STOP_KO = new Set('속보 종합 단독 포토 영상 기자 뉴스 오늘 내일 어제 올해 내년 지난 이번 관련 대해 위해 통해 대한 있다 없다 한다 했다 된다 것으로 것이 등을 등이 이상 이하 가운데 때문 위한 따른 하는 에서 으로 그리고 하지만 또는 최근 현재 오전 오후 사진 인터뷰 사설 칼럼 기고 논평 전문 1보 2보 3보 상보'.split(' '));
+const KO_TAIL = /(에서는|에서도|에게서|으로는|으로도|이라고|라고|에서|에게|으로|부터|까지|처럼|보다|이나|에는|에도|과의|와의|들이|들은|들을|했다|한다|됐다|된다|하는|하고|하며|하면|이다|은|는|이|가|을|를|의|에|도|만|와|과|로)$/;
+let SEG = null;
+try { if (window.Intl && Intl.Segmenter) SEG = new Intl.Segmenter('zh-CN', { granularity: 'word' }); } catch (e) {}
+
+function tokens(it) {
+  const out = new Set();
+  if (it.lang === 'zh') {
+    const s = it.n;
+    if (SEG) {
+      for (const g of SEG.segment(s)) {
+        if (!g.isWordLike) continue;
+        const w = g.segment;
+        if (/^[\d.,%]+$/.test(w)) continue;
+        if (/^[A-Za-z]+$/.test(w)) { if (w.length >= 2) out.add(w.toUpperCase()); continue; }
+        if (w.length < 2 || STOP_ZH.has(w)) continue;
+        out.add(w);
+      }
+    } else {
+      for (const run of s.match(/[一-鿿]{2,}/g) || []) for (let i = 0; i < run.length - 1; i++) { const w = run.slice(i, i + 2); if (!STOP_ZH.has(w)) out.add(w); }
+      for (const w of s.match(/[A-Za-z]{2,}/g) || []) out.add(w.toUpperCase());
+    }
+  } else {
+    for (let w of it.title.split(/[^가-힣A-Za-z0-9]+/)) {
+      if (!w || /^\d+$/.test(w)) continue;
+      if (/^[A-Za-z0-9]+$/.test(w)) { if (w.length >= 2 && /[A-Za-z]/.test(w)) out.add(w.toUpperCase()); continue; }
+      if (w.length >= 3) w = w.replace(KO_TAIL, '');
+      if (w.length < 2 || STOP_KO.has(w)) continue;
+      out.add(w);
+    }
+  }
+  return [...out];
+}
+
+/* 话题词典：[话题, 中文关键词(简体), 韩文关键词] */
+const TOPICS = [
+  ['政治', '总统 总理 首相 国会 议会 选举 大选 投票 政府 内阁 执政 在野 政党 民主党 共和党 国民党 民进党 弹劾 立法 修宪 主席 书记 两会 人大 政协 官员 部长 市长 议员 候选 罢免 施政', '대통령 총리 국회 선거 대선 총선 투표 정부 내각 여당 야당 민주당 국민의힘 탄핵 의원 장관 후보 정치 공천 청와대 대통령실 특검 개헌 당대표'],
+  ['国际', '美国 中美 俄罗斯 乌克兰 欧盟 联合国 外交 外长 峰会 访问 会晤 会谈 特朗普 普京 中东 以色列 伊朗 加沙 日本 朝鲜 印度 北约 大使 双边 国际 全球 G20 APEC 东盟', '미국 중국 일본 러시아 우크라이나 유럽 유엔 외교 정상회담 트럼프 푸틴 시진핑 중동 이스라엘 이란 가자 북한 나토 대사 국제 순방 APEC G20 한미 한중 한일'],
+  ['财经', '经济 股市 股票 A股 港股 美股 指数 央行 利率 降息 加息 通胀 汇率 人民币 美元 关税 贸易 出口 进口 GDP 财政 楼市 房价 银行 基金 债券 投资 上市 财报 营收 利润 消费 就业 油价 黄金 比特币 企业 市场', '경제 증시 코스피 코스닥 주가 주식 금리 환율 물가 관세 무역 수출 수입 GDP 부동산 집값 은행 펀드 채권 투자 상장 실적 매출 영업이익 소비 고용 유가 비트코인 기업 시장 한은 금융'],
+  ['科技', '科技 芯片 半导体 人工智能 AI 大模型 机器人 算力 华为 苹果 特斯拉 英伟达 台积电 三星 手机 电动车 新能源 电池 航天 卫星 火箭 量子 互联网 数据 软件 算法 自动驾驶 5G 6G', '기술 반도체 인공지능 AI 로봇 삼성전자 SK하이닉스 엔비디아 애플 테슬라 스마트폰 전기차 배터리 우주 위성 로켓 양자 인터넷 데이터 소프트웨어 자율주행 플랫폼 네이버 카카오'],
+  ['军事安全', '军事 军队 解放军 导弹 核武 核试 军演 演习 战机 航母 军舰 国防 袭击 空袭 战争 冲突 停火 开火 无人机 武器 恐袭 间谍 安全 海警 部队', '군사 군대 미사일 핵 훈련 전투기 항모 국방 공습 전쟁 충돌 휴전 드론 무기 테러 간첩 안보 도발 발사 해군 육군 공군 합참'],
+  ['社会', '警方 法院 检察 判决 逮捕 案件 诈骗 事故 火灾 地震 台风 暴雨 洪水 遇难 伤亡 死亡 失踪 救援 交通 地铁 高铁 航班 教育 学校 学生 高考 人口 生育 养老 天气 寒潮 气温 环保 居民 社区', '경찰 법원 검찰 판결 체포 구속 사건 사기 사고 화재 지진 태풍 폭우 홍수 사망 실종 구조 교통 지하철 항공 교육 학교 학생 수능 인구 출산 날씨 한파 기온 환경 주민 재판 선고 혐의'],
+  ['健康', '医院 医生 医疗 疫情 病毒 流感 疫苗 药品 癌症 健康 卫生 感染 医保 手术 患者 疾病', '병원 의사 의료 코로나 바이러스 독감 백신 의약품 암 건강 감염 건강보험 수술 환자 질병 의대 전공의'],
+  ['体育', '比赛 冠军 决赛 联赛 世界杯 奥运 亚运 足球 篮球 网球 乒乓 羽毛球 NBA 中超 国足 夺冠 球员 教练 进球 金牌 选手 体育', '경기 우승 결승 리그 월드컵 올림픽 축구 농구 야구 배구 골프 테니스 KBO MLB 손흥민 선수 감독 금메달 스포츠 득점 승리'],
+  ['文娱', '电影 票房 电视剧 综艺 演员 导演 歌手 演唱会 明星 艺人 音乐 专辑 游戏 动画 文化 展览 旅游 景区 网红 颁奖', '영화 드라마 예능 배우 감독 가수 콘서트 아이돌 연예 음악 앨범 게임 문화 전시 여행 관광 BTS 블랙핑크 K팝 시상식 방송'],
+].map(([name, zh, ko]) => ({ name, zh: zh.split(' '), ko: ko.split(' ') }));
+
+const POS = { zh: '增长 上涨 大涨 回升 反弹 复苏 突破 新高 创纪录 成功 夺冠 获奖 获胜 胜利 达成 签署 合作 利好 改善 提升 加速 扩大 稳定 回暖 喜讯 庆祝 获批 通过 首发 领先 好转 和解 援助 重启 盈利'.split(' '), ko: '상승 급등 반등 회복 돌파 최고 신기록 성공 우승 수상 승리 타결 체결 협력 호재 개선 확대 안정 호조 축하 통과 흑자 최대 합의 지원 재개 역대급 선두'.split(' ') };
+const NEG = { zh: '下跌 暴跌 大跌 下滑 衰退 危机 亏损 裁员 破产 违约 制裁 冲突 战争 袭击 空袭 爆炸 遇难 死亡 身亡 伤亡 事故 火灾 地震 灾害 失踪 逮捕 起诉 判刑 诈骗 丑闻 抗议 罢工 警告 威胁 紧张 恶化 崩盘 停摆 谴责 失败 感染 疫情 腐败 被捕 坠毁 撞车 泄露'.split(' '), ko: '하락 급락 폭락 침체 위기 적자 감원 파산 제재 충돌 전쟁 공습 폭발 사망 숨져 사고 화재 지진 재해 실종 체포 구속 기소 실형 사기 논란 시위 파업 경고 위협 긴장 악화 붕괴 규탄 실패 감염 비리 추락 유출 참사 피해 혐의 의혹'.split(' ') };
+const TENSE = { zh: '战争 冲突 袭击 空袭 导弹 核 制裁 军演 开火 爆炸 恐袭 威胁 危机 暴跌 崩盘 紧急 警报 遇难 灾 地震 事故 抗议 骚乱 政变 弹劾 对抗 报复 封锁 戒严'.split(' '), ko: '전쟁 충돌 공습 미사일 핵 제재 훈련 폭발 테러 위협 위기 폭락 붕괴 긴급 경보 참사 재난 지진 사고 시위 쿠데타 탄핵 도발 보복 봉쇄 계엄 비상'.split(' ') };
+
+const ENTS = [
+  ['美国', '美国 美方 白宫 华盛顿', '미국 백악관 워싱턴'], ['中国', '中国 中方 北京 大陆', '중국 베이징'], ['韩国', '韩国 首尔 韩方', '한국 서울 우리나라'],
+  ['日本', '日本 东京 日方', '일본 도쿄'], ['朝鲜', '朝鲜 平壤 金正恩', '북한 평양 김정은'], ['俄罗斯', '俄罗斯 俄方 普京 莫斯科', '러시아 푸틴 모스크바'],
+  ['乌克兰', '乌克兰 泽连斯基 基辅', '우크라이나 젤렌스키'], ['台湾', '台湾 台海 两岸', '대만 양안'], ['中东', '以色列 伊朗 加沙 中东 哈马斯', '이스라엘 이란 가자 중동 하마스'],
+  ['欧洲', '欧盟 欧洲 德国 法国 英国', '유럽 EU 독일 프랑스 영국'], ['特朗普', '特朗普 川普', '트럼프'], ['关税与贸易', '关税 贸易战 贸易', '관세 무역'],
+  ['半导体', '芯片 半导体 晶片 台积电', '반도체 칩 TSMC'], ['人工智能', '人工智能 AI 大模型', '인공지능 AI'], ['股市', '股市 股指 A股 美股 港股', '증시 코스피 코스닥 주가'],
+  ['汇率与利率', '汇率 利率 降息 加息 央行', '환율 금리 한은 연준'], ['三星', '三星', '삼성'], ['电动车', '电动车 新能源车 特斯拉 比亚迪', '전기차 테슬라 BYD'],
+].map(([name, zh, ko]) => ({ name, zh: zh.split(' '), ko: ko.split(' ') }));
+
+const hits = (text, words) => { let n = 0; for (const w of words) if (text.includes(w)) n++; return n; };
+
+function enrich(it) {
+  if (it.tok) return it;
+  it.n = it.lang === 'zh' ? t2s(it.title) : it.title;
+  const up = it.n.toUpperCase();
+  it.tok = tokens(it);
+  let best = 0; it.topic = '其他';
+  for (const t of TOPICS) { const h = hits(up, t[it.lang]); if (h > best) { best = h; it.topic = t.name; } }
+  const p = hits(it.n, POS[it.lang]), n = hits(it.n, NEG[it.lang]);
+  it.sent = p > n ? 1 : n > p ? -1 : 0;
+  it.tense = hits(it.n, TENSE[it.lang]) > 0;
+  it.ents = ENTS.filter((e) => hits(up, e[it.lang]) > 0).map((e) => e.name);
+  return it;
+}
+
+/* ---------- 数据 ---------- */
+const STORE = 'headline-radar-v1';
+let ALL = [], SOURCES = [], GENERATED = 0, WIN = 'today', LIMIT = 120, timer = null, nextAt = 0;
+
+function loadStore() { try { return JSON.parse(localStorage.getItem(STORE) || '[]'); } catch (e) { return []; } }
+function saveStore(items) {
+  try { localStorage.setItem(STORE, JSON.stringify(items.slice(0, 4000).map(({ title, link, ts, src, via, lang, region, feed }) => ({ title, link, ts, src, via, lang, region, feed })))); } catch (e) {}
+}
+function merge(fresh) {
+  const now = Date.now(), seen = new Set(), out = [];
+  for (const it of [...fresh, ...loadStore()]) {
+    if (!it || !it.title || !it.ts || now - it.ts > 72 * H) continue;
+    const k = it.lang + '|' + it.title;
+    if (seen.has(k)) continue; seen.add(k); out.push(it);
+  }
+  out.sort((a, b) => b.ts - a.ts);
+  saveStore(out);
+  return out.map(enrich);
+}
+
+async function refresh(force) {
+  $('#dot').className = 'dot busy'; $('#stamp').textContent = '正在抓取各媒体新闻源…';
+  try {
+    const r = await fetch('api/news' + (force ? '?fresh=' + Date.now() : ''), { cache: 'no-store' });
+    if (!r.ok) throw new Error('接口返回 ' + r.status);
+    const d = await r.json();
+    SOURCES = d.sources || []; GENERATED = d.generatedAt || Date.now();
+    ALL = merge(d.items || []);
+    $('#err').innerHTML = d.items && d.items.length ? '' : '<div class="errbox">这一轮没有抓到任何头条，所有新闻源都没有响应。下方显示的是本机之前保存的内容。可以稍后点“立即刷新”再试。</div>';
+    $('#dot').className = 'dot';
+  } catch (e) {
+    ALL = merge([]);
+    $('#dot').className = 'dot err';
+    $('#err').innerHTML = '<div class="errbox"><b>没能连上抓取接口（/api/news）。</b> ' + esc(e.message) + '。如果是直接双击打开的 index.html，请改用 <code>node dev-server.mjs</code> 在本机运行，或部署到 Cloudflare Pages 后访问。' + (ALL.length ? '下方显示的是本机之前保存的头条。' : '') + '</div>';
+  }
+  render();
+  clearTimeout(timer); nextAt = Date.now() + 300000; timer = setTimeout(() => refresh(false), 300000);
+}
+
+function windowRange() {
+  const now = Date.now();
+  if (WIN === 'today') { const d = new Date(); d.setHours(0, 0, 0, 0); return [d.getTime(), now]; }
+  return [now - (+WIN) * H, now];
+}
+
+/* ---------- 指标 ---------- */
+function analyse() {
+  const [a, b] = windowRange(), len = b - a;
+  const W = ALL.filter((i) => i.ts >= a && i.ts <= b), P = ALL.filter((i) => i.ts >= a - len && i.ts < a);
+  const now = b;
+  const rate = (from, to) => ALL.filter((i) => i.ts >= from && i.ts < to).length / ((to - from) / H);
+  const v3 = rate(now - 3 * H, now + 1), v3p = rate(now - 6 * H, now - 3 * H);
+  const hourly24 = Array.from({ length: 24 }, (_, k) => ALL.filter((i) => i.ts >= now - (k + 1) * H && i.ts < now - k * H).length);
+  const mean = hourly24.reduce((s, x) => s + x, 0) / 24, sd = Math.sqrt(hourly24.reduce((s, x) => s + (x - mean) ** 2, 0) / 24);
+  const heat = sd > 0 ? Math.max(0, Math.min(100, 50 + 15 * (v3 - mean) / sd)) : 50;
+  const pos = W.filter((i) => i.sent > 0).length, neg = W.filter((i) => i.sent < 0).length;
+  const count = (arr, key) => { const m = new Map(); for (const i of arr) m.set(i[key], (m.get(i[key]) || 0) + 1); return m; };
+  const bySrc = count(W, 'src'), shares = [...bySrc.values()].map((c) => c / (W.length || 1)).sort((x, y) => y - x);
+  const byTopic = count(W, 'topic'), tp = [...byTopic.values()].map((c) => c / (W.length || 1));
+  const entropy = tp.length > 1 ? -tp.reduce((s, p) => s + p * Math.log(p), 0) / Math.log(TOPICS.length + 1) : 0;
+  const ent = ENTS.map((e) => ({ name: e.name, zh: W.filter((i) => i.lang === 'zh' && i.ents.includes(e.name)).length, ko: W.filter((i) => i.lang === 'ko' && i.ents.includes(e.name)).length }));
+  const dot = ent.reduce((s, e) => s + e.zh * e.ko, 0), nz = Math.sqrt(ent.reduce((s, e) => s + e.zh ** 2, 0)), nk = Math.sqrt(ent.reduce((s, e) => s + e.ko ** 2, 0));
+  const ages = W.map((i) => now - i.ts).sort((x, y) => x - y);
+  return {
+    a, b, W, P, v3, v3p, heat, mean, sd, pos, neg, bySrc, byTopic, ent,
+    hhi: shares.reduce((s, p) => s + p * p, 0) * 10000, cr4: shares.slice(0, 4).reduce((s, p) => s + p, 0),
+    entropy, reson: nz && nk ? dot / (nz * nk) * 100 : null,
+    tense: W.length ? W.filter((i) => i.tense).length / W.length : 0,
+    medAge: ages.length ? ages[Math.floor(ages.length / 2)] : null, cv: mean ? sd / mean : 0,
+  };
+}
+const delta = (cur, prev) => prev > 0 ? (cur - prev) / prev : null;
+function dHtml(d, suffix = '') {
+  if (d == null) return '<span>暂无对比数据</span>';
+  const c = d > 0.005 ? 'up' : d < -0.005 ? 'down' : '';
+  return `<span class="${c} num">${d > 0.005 ? '▲' : d < -0.005 ? '▼' : '—'} ${Math.abs(d * 100).toFixed(0)}%</span>${suffix}`;
+}
+
+function renderTape(A) {
+  const n = A.W.length, zh = A.W.filter((i) => i.lang === 'zh').length;
+  const sentIdx = A.pos + A.neg ? (A.pos - A.neg) / (A.pos + A.neg) * 100 : 0;
+  const age = A.medAge == null ? '—' : A.medAge < H ? Math.round(A.medAge / 60000) + '<small>分钟</small>' : (A.medAge / H).toFixed(1) + '<small>小时</small>';
+  const tiles = [
+    ['头条总量', `${n}<small>条</small>`, dHtml(delta(n, A.P.length), ' 较上一周期'), `中文 ${zh} 条，韩文 ${n - zh} 条`],
+    ['发稿速度', `${A.v3.toFixed(1)}<small>条/时</small>`, dHtml(delta(A.v3, A.v3p), ' 动量'), '最近3小时平均每小时条数，对比再往前3小时'],
+    ['热度指数', `${A.heat.toFixed(0)}`, A.heat >= 65 ? '<span class="up">偏热</span>' : A.heat <= 35 ? '<span class="down">偏冷</span>' : '平常水平', `50 为近24小时平均水平\n24小时均值 ${A.mean.toFixed(1)} 条/时，标准差 ${A.sd.toFixed(1)}`],
+    ['情绪指数', `${sentIdx > 0 ? '+' : ''}${sentIdx.toFixed(0)}`, `正面 ${A.pos} 条　负面 ${A.neg} 条`, '(正面−负面)÷(正面+负面)×100，词表估算'],
+    ['紧张指数', pct(A.tense), A.tense >= .25 ? '<span class="up">风险词偏多</span>' : '含风险词的标题占比', '标题含战争、制裁、事故、暴跌等词的比例'],
+    ['来源集中度', `${A.hhi.toFixed(0)}<small>HHI</small>`, `${A.hhi < 1500 ? '分散' : A.hhi < 2500 ? '适中' : '集中'}　CR4 ${pct(A.cr4)}`, `共 ${A.bySrc.size} 家媒体\n前四家合计占 ${pct(A.cr4)}`],
+    ['话题多样性', A.entropy.toFixed(2), A.entropy > .8 ? '分布均匀' : A.entropy > .6 ? '较为多元' : '集中在少数话题', '话题分布的归一化香农熵，1 为完全均匀'],
+    ['中韩共振度', A.reson == null ? '—' : A.reson.toFixed(0), A.reson == null ? '某一语言暂无数据' : A.reson > 70 ? '关注点高度重合' : A.reson > 40 ? '部分重合' : '各看各的', '两种语言对同一批国家、人物、议题的提及向量的余弦相似度（0–100）'],
+    ['头条新鲜度', age, '发布时间中位数', '所选周期内，头条距离现在的时间的中位数'],
+    ['波动率', pct(A.cv), A.cv > 1 ? '发稿很不均匀' : '每小时条数的离散程度', '近24小时每小时条数的标准差÷均值'],
+  ];
+  $('#tape').innerHTML = tiles.map(([k, v, d, tip]) => `<div class="tile" data-tip="${esc(tip)}" tabindex="0"><div class="k">${k}</div><div class="v num">${v}</div><div class="d">${d}</div></div>`).join('');
+}
+
+/* ---------- 发稿节奏图 ---------- */
+function renderChart(A) {
+  const box = $('#chart'), Wd = Math.max(300, box.clientWidth), Ht = 210, m = { l: 30, r: 8, t: 10, b: 24 };
+  const start = Math.floor(A.a / H) * H, nb = Math.max(1, Math.ceil((A.b - start) / H));
+  const bins = Array.from({ length: nb }, (_, k) => ({ t: start + k * H, zh: 0, ko: 0 }));
+  for (const i of A.W) { const k = Math.floor((i.ts - start) / H); if (bins[k]) bins[k][i.lang]++; }
+  const tot = bins.map((x) => x.zh + x.ko), max = Math.max(4, ...tot);
+  const step = max <= 8 ? 2 : max <= 20 ? 5 : max <= 50 ? 10 : max <= 100 ? 25 : Math.ceil(max / 4 / 50) * 50;
+  const top = Math.ceil(max / step) * step, pw = Wd - m.l - m.r, ph = Ht - m.t - m.b, bw = pw / nb, y = (v) => m.t + ph - v / top * ph;
+  const w = Math.max(2, Math.min(22, bw - 2));
+  let s = `<svg width="${Wd}" height="${Ht}" role="img" aria-label="每小时头条数量柱状图">`;
+  for (let v = 0; v <= top; v += step) s += `<line x1="${m.l}" x2="${Wd - m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--rule2)"/><text x="${m.l - 6}" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+  const every = Math.ceil(nb / (Wd < 520 ? 6 : 12));
+  bins.forEach((x, k) => {
+    const cx = m.l + bw * k + bw / 2, hz = x.zh / top * ph, hk = x.ko / top * ph, gap = x.zh && x.ko ? 2 : 0;
+    if (x.zh) s += `<rect x="${cx - w / 2}" y="${m.t + ph - hz}" width="${w}" height="${hz}" fill="var(--zh)" ${x.ko ? '' : 'rx="2"'}/>`;
+    if (x.ko) s += `<rect x="${cx - w / 2}" y="${m.t + ph - hz - hk}" width="${w}" height="${Math.max(0, hk - gap)}" fill="var(--ko)" rx="2"/>`;
+    if (k % every === 0) s += `<text x="${cx}" y="${Ht - 7}" text-anchor="middle">${new Date(x.t).getHours()}时</text>`;
+    s += `<rect x="${m.l + bw * k}" y="${m.t}" width="${bw}" height="${ph}" fill="transparent" data-tip="${hm(x.t)}–${hm(x.t + H)}\n中文 ${x.zh} 条\n韩文 ${x.ko} 条\n合计 ${x.zh + x.ko} 条"/>`;
+  });
+  if (nb >= 3) {
+    const pts = tot.map((_, k) => { const sl = tot.slice(Math.max(0, k - 2), k + 1); return `${m.l + bw * k + bw / 2},${y(sl.reduce((p, q) => p + q, 0) / sl.length)}`; });
+    s += `<polyline points="${pts.join(' ')}" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round" pointer-events="none"/>`;
+  }
+  box.innerHTML = s + '</svg>';
+}
+
+/* ---------- 热点事件（同语言标题聚类） ---------- */
+function clusters(items) {
+  const parent = items.map((_, i) => i), find = (x) => parent[x] === x ? x : (parent[x] = find(parent[x]));
+  const idx = new Map();
+  items.forEach((it, i) => it.tok.forEach((t) => { if (!idx.has(t)) idx.set(t, []); idx.get(t).push(i); }));
+  const cap = Math.max(12, items.length * 0.06);
+  items.forEach((it, i) => {
+    const shared = new Map();
+    for (const t of it.tok) { const l = idx.get(t); if (l.length > cap) continue; for (const j of l) if (j < i) shared.set(j, (shared.get(j) || 0) + 1); }
+    for (const [j, c] of shared) {
+      const u = it.tok.length + items[j].tok.length - c;
+      if (c >= 3 && c / u >= 0.34 || c >= 2 && c / u >= 0.6) parent[find(i)] = find(j);
+    }
+  });
+  const g = new Map();
+  items.forEach((it, i) => { const r = find(i); if (!g.has(r)) g.set(r, []); g.get(r).push(it); });
+  const now = Date.now();
+  return [...g.values()].map((list) => {
+    const srcs = new Set(list.map((i) => i.src)), last = Math.max(...list.map((i) => i.ts)), first = Math.min(...list.map((i) => i.ts));
+    return { list, srcs: srcs.size, last, first, heat: srcs.size * Math.pow(0.5, (now - last) / (6 * H)) + list.length * 0.1 };
+  }).filter((c) => c.srcs >= 2).sort((x, y) => y.heat - x.heat).slice(0, 6);
+}
+function renderStories(A) {
+  for (const [lang, el] of [['zh', '#stZh'], ['ko', '#stKo']]) {
+    const cs = clusters(A.W.filter((i) => i.lang === lang));
+    $(el).innerHTML = cs.length ? cs.map((c) => {
+      const head = c.list.reduce((p, q) => (q.ts > p.ts ? q : p));
+      return `<div class="story"><div class="t"><span class="heat num" title="热度">${c.heat.toFixed(1)}</span><a href="${esc(head.link)}" target="_blank" rel="noopener">${esc(head.title)}</a></div>
+      <div class="m num">${c.srcs} 家媒体，${c.list.length} 条报道，首发 ${hm(c.first)}，最新 ${hm(c.last)}；${esc([...new Set(c.list.map((i) => i.src))].slice(0, 4).join('、'))}</div></div>`;
+    }).join('') : '<p class="note">这个周期里还没有被两家以上媒体同时报道的事件。</p>';
+  }
+}
+
+/* ---------- 关键词 ---------- */
+function kwCounts(items) { const m = new Map(); for (const i of items) for (const t of i.tok) m.set(t, (m.get(t) || 0) + 1); return m; }
+function renderKw(A) {
+  for (const [lang, el] of [['zh', '#kwZh'], ['ko', '#kwKo']]) {
+    const cur = kwCounts(A.W.filter((i) => i.lang === lang)), prev = kwCounts(A.P.filter((i) => i.lang === lang));
+    const top = [...cur].filter(([, c]) => c >= 2).sort((x, y) => y[1] - x[1]).slice(0, 12), max = top[0]?.[1] || 1, hasPrev = prev.size > 0;
+    $(el).innerHTML = top.length ? `<table><thead><tr><th>词语</th><th style="width:38%">出现条数</th><th class="r">涨跌</th></tr></thead><tbody>` + top.map(([w, c]) => {
+      const p = prev.get(w) || 0, d = !hasPrev ? '<span class="note">—</span>' : p === 0 ? '<span class="up">新上榜</span>' : dHtml((c - p) / p);
+      return `<tr><td><button class="kw" data-kw="${esc(w)}">${esc(w)}</button></td><td><div style="display:flex;align-items:center;gap:6px"><div class="bar" style="width:${c / max * 100}%;background:var(--${lang})"></div><span class="num">${c}</span></div></td><td class="r num">${d}</td></tr>`;
+    }).join('') + '</tbody></table>' : '<p class="note">头条数量还不够，暂时排不出榜单。</p>';
+  }
+}
+
+/* ---------- 共同关注 / 话题 / 声量 / 标题体检 / 源状态 ---------- */
+function renderEnt(A) {
+  const rows = A.ent.filter((e) => e.zh + e.ko > 0).sort((x, y) => (y.zh + y.ko) - (x.zh + x.ko)).slice(0, 12), max = Math.max(1, ...rows.map((e) => Math.max(e.zh, e.ko)));
+  $('#ent').innerHTML = rows.length ? `<table><thead><tr><th class="r" style="width:38%">中文头条</th><th style="text-align:center">对象</th><th style="width:38%">韩文头条</th></tr></thead><tbody>` + rows.map((e) =>
+    `<tr><td><div style="display:flex;align-items:center;gap:6px"><span class="num" style="margin-left:auto">${e.zh}</span><div class="barl" style="width:${e.zh / max * 70}%;background:var(--zh);margin-left:0"></div></div></td><td style="text-align:center;white-space:nowrap">${e.name}</td><td><div style="display:flex;align-items:center;gap:6px"><div class="bar" style="width:${e.ko / max * 70}%;background:var(--ko)"></div><span class="num">${e.ko}</span></div></td></tr>`).join('') + '</tbody></table>' : '<p class="note">暂无数据。</p>';
+}
+function renderTopics(A) {
+  const nz = A.W.filter((i) => i.lang === 'zh').length || 1, nk = A.W.filter((i) => i.lang === 'ko').length || 1;
+  const rows = [...TOPICS.map((t) => t.name), '其他'].map((name) => ({ name, zh: A.W.filter((i) => i.lang === 'zh' && i.topic === name).length / nz, ko: A.W.filter((i) => i.lang === 'ko' && i.topic === name).length / nk })).sort((x, y) => (y.zh + y.ko) - (x.zh + x.ko));
+  const max = Math.max(.01, ...rows.map((r) => Math.max(r.zh, r.ko)));
+  $('#topics').innerHTML = `<table><thead><tr><th>话题</th><th style="width:36%">中文</th><th style="width:36%">韩文</th></tr></thead><tbody>` + rows.map((r) =>
+    `<tr><td style="white-space:nowrap">${r.name}</td>${['zh', 'ko'].map((l) => `<td><div style="display:flex;align-items:center;gap:6px"><div class="bar" style="width:${r[l] / max * 72}%;background:var(--${l})"></div><span class="num">${pct(r[l])}</span></div></td>`).join('')}</tr>`).join('') + '</tbody></table>';
+}
+function renderSov(A) {
+  const lang = new Map(A.W.map((i) => [i.src, i.lang])), reg = new Map(A.W.map((i) => [i.src, i.region]));
+  const rows = [...A.bySrc].sort((x, y) => y[1] - x[1]).slice(0, 12), max = rows[0]?.[1] || 1, n = A.W.length || 1;
+  $('#sov').innerHTML = rows.length ? `<table><thead><tr><th>媒体</th><th style="width:34%">条数</th><th class="r">占比</th></tr></thead><tbody>` + rows.map(([s, c]) =>
+    `<tr><td><span class="chip ${lang.get(s)}">${LANG[lang.get(s)]}</span> ${esc(s)} <span class="note">${esc(reg.get(s))}</span></td><td><div style="display:flex;align-items:center;gap:6px"><div class="bar" style="width:${c / max * 100}%;background:var(--${lang.get(s)})"></div><span class="num">${c}</span></div></td><td class="r num">${pct(c / n, 1)}</td></tr>`).join('') + '</tbody></table>' : '<p class="note">暂无数据。</p>';
+}
+function renderFmt(A) {
+  const stat = (lang) => {
+    const L = A.W.filter((i) => i.lang === lang), n = L.length || 1, share = (re) => pct(L.filter((i) => re.test(i.title)).length / n);
+    const lens = L.map((i) => [...i.title.replace(/\s/g, '')].length);
+    return [L.length ? (lens.reduce((s, x) => s + x, 0) / n).toFixed(1) + ' 字' : '—', share(/\d/), share(/[?？]/), share(/[!！]/), share(/["“”「」『』'‘’]/), share(/突发|快讯|速报|最新|刚刚|속보|긴급/), share(/独家|专访|單獨|단독|인터뷰/)];
+  };
+  const z = stat('zh'), k = stat('ko'), names = ['平均标题长度', '带数字', '带问号', '带感叹号', '带引语', '突发或快讯类', '独家或专访类'];
+  $('#fmt').innerHTML = `<table><thead><tr><th>特征</th><th class="r">中文</th><th class="r">韩文</th></tr></thead><tbody>` + names.map((nm, i) => `<tr><td>${nm}</td><td class="r num">${z[i]}</td><td class="r num">${k[i]}</td></tr>`).join('') + '</tbody></table>';
+}
+function renderSrc() {
+  const ok = SOURCES.filter((s) => s.ok && s.count).length;
+  $('#srcNote').textContent = SOURCES.length ? `${SOURCES.length} 个新闻源，本轮 ${ok} 个有内容` : '';
+  $('#src').innerHTML = SOURCES.length ? `<table><thead><tr><th>新闻源</th><th>地区</th><th>状态</th><th class="r">条数</th><th class="r">耗时</th><th class="r">最新一条</th></tr></thead><tbody>` + SOURCES.map((s) =>
+    `<tr><td><span class="chip ${s.lang}">${LANG[s.lang]}</span> ${esc(s.name)}</td><td>${esc(s.region)}</td><td>${s.ok ? (s.count ? '<span class="ok">✓ 正常</span>' : '<span class="note">✓ 无近期条目</span>') : `<span class="bad">✕ ${esc(s.error || '失败')}</span>`}</td><td class="r num">${s.count}</td><td class="r num">${(s.ms / 1000).toFixed(1)}秒</td><td class="r num">${s.newest ? hm(s.newest) : '—'}</td></tr>`).join('') + '</tbody></table>' : '<p class="note">还没有拿到新闻源状态。</p>';
+}
+
+/* ---------- 时间线 ---------- */
+function renderTl(A) {
+  const lang = $('#fLang').value, topic = $('#fTopic').value, region = $('#fRegion').value, q = $('#fQ').value.trim().toLowerCase(), qs = q && t2s(q);
+  const L = A.W.filter((i) => (!lang || i.lang === lang) && (!topic || i.topic === topic) && (!region || i.region === region) && (!q || i.n.toLowerCase().includes(qs) || i.title.toLowerCase().includes(q) || i.src.toLowerCase().includes(q)));
+  $('#tlNote').textContent = `${L.length} 条，按发布时间从新到旧`;
+  if (!L.length) { $('#tl').innerHTML = `<div class="empty">${A.W.length ? '没有符合筛选条件的头条，换个条件试试。' : '这个周期里还没有头条。可以切换到“近24小时”，或稍后刷新。'}</div>`; return; }
+  let html = '', cur = null;
+  const hourCount = new Map(); for (const i of L) { const k = Math.floor(i.ts / H); hourCount.set(k, (hourCount.get(k) || 0) + 1); }
+  for (const i of L.slice(0, LIMIT)) {
+    const k = Math.floor(i.ts / H);
+    if (k !== cur) { cur = k; const d = new Date(k * H); html += `<div class="hour num"><span>${d.getMonth() + 1}月${d.getDate()}日 ${pad(d.getHours())}:00–${pad((d.getHours() + 1) % 24)}:00</span><span>${hourCount.get(k)} 条</span></div>`; }
+    html += `<article class="it" data-lang="${i.lang}"><time class="num" datetime="${new Date(i.ts).toISOString()}">${hm(i.ts)}</time><div><a class="t" href="${esc(i.link)}" target="_blank" rel="noopener" lang="${i.lang}">${esc(i.title)}</a>
+      <div class="m"><span class="chip ${i.lang}">${LANG[i.lang]}</span><span>${esc(i.src)}</span><span>${esc(i.region)}</span><span class="tag">${i.topic}</span>${i.sent ? `<span class="${i.sent > 0 ? 'up' : 'down'}">${i.sent > 0 ? '＋正面' : '－负面'}</span>` : ''}</div></div></article>`;
+  }
+  if (L.length > LIMIT) html += `<button class="btn more" id="more">再显示 120 条（还有 ${L.length - LIMIT} 条）</button>`;
+  $('#tl').innerHTML = html;
+}
+
+let LAST = null;
+function render() {
+  const A = LAST = analyse();
+  const regions = [...new Set(ALL.map((i) => i.region))];
+  const fill = (sel, opts, first) => { const el = $(sel), v = el.value; el.innerHTML = `<option value="">${first}</option>` + opts.map((o) => `<option>${esc(o)}</option>`).join(''); el.value = opts.includes(v) ? v : ''; };
+  fill('#fTopic', [...TOPICS.map((t) => t.name), '其他'], '全部话题'); fill('#fRegion', regions, '全部地区');
+  renderTape(A); renderChart(A); renderStories(A); renderKw(A); renderEnt(A); renderTopics(A); renderSov(A); renderFmt(A); renderSrc(); renderTl(A);
+  stamp();
+}
+function stamp() {
+  if ($('#dot').classList.contains('busy')) return;
+  const left = Math.max(0, Math.round((nextAt - Date.now()) / 1000));
+  $('#stamp').textContent = (GENERATED ? `数据更新于 ${hm(GENERATED)}，` : '') + `${Math.floor(left / 60)}分${pad(left % 60)}秒后自动刷新`;
+}
+setInterval(stamp, 1000);
+
+/* ---------- 交互 ---------- */
+$('#winSeg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; WIN = b.dataset.win; LIMIT = 120; for (const x of $('#winSeg').children) x.setAttribute('aria-pressed', x === b); render(); });
+document.querySelector('.tabs .seg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; document.body.dataset.view = b.dataset.view; for (const x of b.parentNode.children) x.setAttribute('aria-pressed', x === b); if (LAST) renderChart(LAST); });
+$('#refresh').addEventListener('click', () => refresh(true));
+for (const id of ['#fLang', '#fTopic', '#fRegion']) $(id).addEventListener('change', () => { LIMIT = 120; renderTl(LAST); });
+$('#fQ').addEventListener('input', () => { LIMIT = 120; renderTl(LAST); });
+document.addEventListener('click', (e) => {
+  if (e.target.id === 'more') { LIMIT += 120; renderTl(LAST); }
+  const k = e.target.closest('.kw');
+  if (k) { $('#fQ').value = k.dataset.kw; LIMIT = 120; renderTl(LAST); document.body.dataset.view = 'tl'; for (const x of document.querySelectorAll('.tabs button')) x.setAttribute('aria-pressed', x.dataset.view === 'tl'); $('.tl').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+});
+const tip = $('#tip');
+function showTip(el, x, y) { tip.textContent = el.dataset.tip; tip.style.display = 'block'; const r = tip.getBoundingClientRect(); tip.style.left = Math.max(6, Math.min(innerWidth - r.width - 6, x + 12)) + 'px'; tip.style.top = Math.max(6, Math.min(innerHeight - r.height - 6, y + 14)) + 'px'; }
+document.addEventListener('pointermove', (e) => { const el = e.target.closest?.('[data-tip]'); if (el) showTip(el, e.clientX, e.clientY); else tip.style.display = 'none'; });
+document.addEventListener('focusin', (e) => { const el = e.target.closest?.('[data-tip]'); if (el) { const r = el.getBoundingClientRect(); showTip(el, r.left, r.bottom - 10); } });
+document.addEventListener('focusout', () => { tip.style.display = 'none'; });
+let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => LAST && renderChart(LAST), 150); });
+
+refresh(false);
+</script>
+</body>
+</html>
