@@ -85,6 +85,8 @@ button,select,input{font:inherit;color:inherit}
 .it .m{color:var(--mute);font-size:12.5px;margin-top:3px;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center}
 .chip{display:inline-block;font-size:11.5px;line-height:1;padding:3px 6px;border-radius:4px;color:#fff}
 .chip.zh{background:var(--zh)}.chip.ko{background:var(--ko)}
+.tr{color:var(--ink2);font:400 13.5px/1.5 var(--sans);margin-top:2px}.tr:empty{display:none}
+.tr.inline{display:inline;margin:0 0 0 4px;font-weight:400;font-size:12.5px;color:var(--mute)}.tr.inline:not(:empty)::before{content:"（"}.tr.inline:not(:empty)::after{content:"）"}
 .tag{border:1px solid var(--rule);border-radius:4px;padding:1px 6px;font-size:11.5px;color:var(--ink2)}
 .more{display:block;margin:12px auto 6px}
 .empty{padding:28px 16px;color:var(--ink2)}
@@ -159,7 +161,7 @@ td.r,th.r{text-align:right}
 
 <div class="wrap">
   <section class="panel tl" aria-label="头条时间线">
-    <header><h2>头条时间线</h2><span class="note" id="tlNote"></span></header>
+    <header><h2>头条时间线</h2><span class="note" id="tlNote"></span><span class="note" id="trNote" style="margin-left:auto"></span></header>
     <div class="filters">
       <select id="fLang" aria-label="语言"><option value="">中文＋韩文</option><option value="zh">只看中文</option><option value="ko">只看韩文</option></select>
       <select id="fTopic" aria-label="话题"><option value="">全部话题</option></select>
@@ -190,6 +192,7 @@ td.r,th.r{text-align:right}
       <p><b>情绪指数</b>：用正面、负面词表给每条标题打分，（正面条数−负面条数）÷（两者之和）×100，范围−100到+100。<b>紧张指数</b>：标题含战争、制裁、事故、暴跌等风险词的比例。两者都是词表估算，只适合看方向，不代表对单条新闻的判断。</p>
       <p><b>来源集中度（HHI）</b>：各媒体条数占比的平方和×10000，低于1500为分散，高于2500为集中；CR4是前四家媒体的合计占比。<b>话题多样性</b>：话题分布的归一化香农熵，1表示各话题完全均匀。话题按关键词词典归类，没有命中任何词的标题归入“其他”。<b>中韩共振度</b>：两种语言对同一批国家、人物、议题的提及向量的余弦相似度。</p>
       <p>数据来自各媒体公开的RSS与各地区版Google新闻头条，每5分钟更新一次。新闻源一般只保留最近一段时间的条目，所以本页会把看过的头条存在你这台设备的浏览器里（最多保留72小时），打开得越久，环比和涨跌越准。</p>
+      <p><b>韩文翻译</b>：韩文标题下方的中文是机器翻译（Cloudflare Workers AI 的 m2m100 模型），只供了解大意，人名和专有名词可能不准。每条只翻译一次，每天有免费额度上限，用完后当天新标题只显示原文。</p>
     </div></section>
   </div>
 </div>
@@ -210,8 +213,8 @@ const T2S = {};
 ('國国 會会 黨党 總总 統统 選选 舉举 華华 灣湾 臺台 韓韩 鮮鲜 聯联 軍军 戰战 爭争 彈弹 導导 發发 經经 濟济 貿贸 關关 稅税 幣币 匯汇 銀银 價价 漲涨 產产 業业 車车 電电 腦脑 網网 絡络 資资 訊讯 機机 術术 學学 醫医 藥药 療疗 檢检 測测 氣气 災灾 風风 颱台 環环 鐵铁 運运 動动 員员 賽赛 奧奥 億亿 萬万 與与 對对 於于 為为 這这 個个 們们 來来 時时 後后 將将 還还 進进 過过 現现 實实 開开 長长 門门 問问 題题 議议 談谈 訪访 說说 稱称 報报 記记 視视 調调 審审 訴诉 罰罚 殺杀 傷伤 獲获 獎奖 區区 縣县 鄉乡 鎮镇 島岛 東东 亞亚 歐欧 烏乌 蘭兰 紐纽 約约 倫伦 頓顿 買买 賣卖 數数 據据 雲云 圓圆 積积 體体 設设 備备 廠厂 權权 黃黄 龍龙 馬马 鳥鸟 魚鱼 預预 計计 劃划 際际 務务 處处 辦办 專专 勞劳 農农 糧粮 兒儿 婦妇 歲岁 無无 許许 認认 證证 護护 衛卫 隊队 艦舰 飛飞 襲袭 擊击 佔占 領领 離离 難难 壓压 險险 債债 貸贷 購购 併并 擴扩 縮缩 滿满 準准 確确 顯显 觀观 點点 緊紧 張张 變变 應应 響响 樓楼 層层 橋桥 輸输 連连 雙双 單单 創创 紀纪 錄录 歷历 屆届 類类 種种 質质 極极 強强 劇剧 樂乐 畫画 藝艺 遊游 戲戏 館馆 圖图 書书 讀读 語语 譯译 詞词 聲声 頭头 條条 則则 規规 範范 標标 項项 組组 織织 團团 結结 協协 簽签 訂订 讓让 請请 願愿 遷迁 歸归 屬属 歡欢 慶庆 節节 禮礼 喪丧 墜坠 毀毁 燒烧 滅灭 礦矿 煙烟 霧雾 溫温 熱热 濕湿 乾干 淨净 潔洁 汙污 塵尘 廢废 棄弃 棟栋 齡龄 輕轻 幫帮 夢梦 愛爱 親亲 鄰邻 鬥斗 惡恶 壞坏 邊边 遠远 遲迟 適适 遺遗 錢钱 鐘钟 鏡镜 針针 錯错 閉闭 閣阁 陸陆 陽阳 階阶 隨随 隱隐 雜杂 靈灵 靜靜 頁页 順顺 須须 顧顾 顆颗 額额 飯饭 飲饮 養养 餘余 駐驻 驗验 驚惊 髮发 鬆松 麗丽 麼么 齊齐 齒齿 眾众 賴赖 蔣蒋 詐诈 勳勋 碩硕 營营 側侧 嶼屿 澤泽 贏赢 僑侨 鏈链 凱凯 羅罗 薩萨 壘垒 燈灯 簡简 絲丝 參参 們们 僅仅 傳传 債债 優优 內内 兩两 冊册 凍冻 劉刘 劍剑 勝胜 勢势 啟启 嚴严 圍围 園园 執执 場场 壇坛 壯壮 夠够 奪夺 奮奋 孫孙 寶宝 層层 峽峡 廣广 彎弯 態态 憲宪 戶户 損损 擁拥 擬拟 攜携 敗败 斷断 曉晓 榮荣 歐欧 殘残 氫氢 決决 況况 淚泪 漢汉 潛潜 濱滨 爾尔 獨独 獻献 瑪玛 瘋疯 盜盗 盡尽 監监 礙碍 禍祸 稱称 穩稳 競竞 築筑 糾纠 紅红 級级 細细 終终 絕绝 給给 統统 維维 綠绿 線线 練练 總总 績绩 繼继 續续 罷罢 職职 聞闻 脫脱 興兴 舊旧 莊庄 蘇苏 處处 號号 補补 裝装 複复 襲袭 訓训 設设 評评 試试 詢询 誤误 課课 請请 論论 諾诺 謝谢 講讲 譽誉 變变 讚赞 豐丰 貧贫 貨货 責责 貴贵 費费 賀贺 賓宾 質质 贈赠 贊赞 趙赵 躍跃 軌轨 軟软 較较 載载 輛辆 輝辉 輪轮 轉转 農农 迴回 郵邮 釋释 鋼钢 錦锦 鍵键 鎖锁 鑑鉴 閱阅 闆板 闖闯 陣阵 陳陈 險险 雖虽 雞鸡 電电 頻频 顏颜 飆飙 餐餐 驅驱 騙骗 鬧闹 鴻鸿 鹽盐 麥麦 黑黑 齋斋').split(' ').forEach((p) => { T2S[p[0]] = p[1]; });
 const t2s = (s) => s.replace(/[一-鿿]/g, (c) => T2S[c] || c);
 
-const STOP_ZH = new Set('什么 怎么 如何 为何 为什么 一个 一些 没有 可以 这个 那个 我们 他们 你们 自己 已经 还是 就是 不是 但是 因为 所以 如果 以及 对于 关于 通过 进行 表示 认为 指出 称为 今日 今天 昨日 明天 目前 现在 最新 消息 新闻 报道 记者 媒体 视频 图片 直播 快讯 专访 评论 观察 分析 解读 回应 发布 宣布 举行 召开 出席 相关 有关 其中 之后 之前 以来 期间 方面 问题 情况 工作 活动 继续 开始 可能 需要 成为 或将 将在 一次 首次 再次 持续 多名 多人 人士 网友 日电 中新网 人民网 新华社 一年 今年 明年 去年 上午 下午 凌晨 时间 小时 分钟'.split(' '));
-const STOP_KO = new Set('속보 종합 단독 포토 영상 기자 뉴스 오늘 내일 어제 올해 내년 지난 이번 관련 대해 위해 통해 대한 있다 없다 한다 했다 된다 것으로 것이 등을 등이 이상 이하 가운데 때문 위한 따른 하는 에서 으로 그리고 하지만 또는 최근 현재 오전 오후 사진 인터뷰 사설 칼럼 기고 논평 전문 1보 2보 3보 상보'.split(' '));
+const STOP_ZH = new Set('什么 怎么 如何 为何 为什么 一个 一些 没有 可以 这个 那个 我们 他们 你们 自己 已经 还是 就是 不是 但是 因为 所以 如果 以及 对于 关于 通过 进行 表示 认为 指出 称为 今日 今天 昨日 明天 目前 现在 最新 消息 新闻 报道 记者 媒体 视频 图片 直播 快讯 专访 评论 观察 分析 解读 回应 发布 宣布 举行 召开 出席 相关 有关 其中 之后 之前 以来 期间 方面 问题 情况 工作 活动 继续 开始 可能 需要 成为 或将 将在 一次 首次 再次 持续 多名 多人 人士 网友 日电 中新网 人民网 新华社 一年 今年 明年 去年 上午 下午 凌晨 时间 小时 分钟 即时 国际 世界 全国 全球 今早 发生 发现 强调 要求 支持 影响 取消 公布 推出 启动 举办 开幕 曝光'.split(' '));
+const STOP_KO = new Set('속보 종합 단독 포토 영상 기자 뉴스 오늘 내일 어제 올해 내년 지난 이번 관련 대해 위해 통해 대한 있다 없다 한다 했다 된다 것으로 것이 등을 등이 이상 이하 가운데 때문 위한 따른 하는 에서 으로 그리고 하지만 또는 최근 현재 오전 오후 사진 인터뷰 사설 칼럼 기고 논평 전문 1보 2보 3보 상보 만에 다시 이어 이제 모두 없는 없어 사이 결과 시작 우리 가능 이후 까지 부터'.split(' '));
 const KO_TAIL = /(에서는|에서도|에게서|으로는|으로도|이라고|라고|에서|에게|으로|부터|까지|처럼|보다|이나|에는|에도|과의|와의|들이|들은|들을|했다|한다|됐다|된다|하는|하고|하며|하면|이다|은|는|이|가|을|를|의|에|도|만|와|과|로)$/;
 let SEG = null;
 try { if (window.Intl && Intl.Segmenter) SEG = new Intl.Segmenter('zh-CN', { granularity: 'word' }); } catch (e) {}
@@ -271,7 +274,13 @@ const ENTS = [
   ['汇率与利率', '汇率 利率 降息 加息 央行', '환율 금리 한은 연준'], ['三星', '三星', '삼성'], ['电动车', '电动车 新能源车 特斯拉 比亚迪', '전기차 테슬라 BYD'],
 ].map(([name, zh, ko]) => ({ name, zh: zh.split(' '), ko: ko.split(' ') }));
 
-const hits = (text, words) => { let n = 0; for (const w of words) if (text.includes(w)) n++; return n; };
+const LATIN = new Map();
+const has = (text, w) => {
+  if (!/^[A-Z0-9]+$/.test(w)) return text.includes(w);
+  if (!LATIN.has(w)) LATIN.set(w, new RegExp('(^|[^A-Z0-9])' + w + '([^A-Z0-9]|$)'));   // AI、GDP 这类英文词按整词匹配，避免命中 TAIWAN、PAID
+  return LATIN.get(w).test(text);
+};
+const hits = (text, words) => { let n = 0; for (const w of words) if (has(text, w)) n++; return n; };
 
 function enrich(it) {
   if (it.tok) return it;
@@ -285,6 +294,44 @@ function enrich(it) {
   it.tense = hits(it.n, TENSE[it.lang]) > 0;
   it.ents = ENTS.filter((e) => hits(up, e[it.lang]) > 0).map((e) => e.name);
   return it;
+}
+
+/* ---------- 韩文翻译（/api/tr，Workers AI） ---------- */
+const TRKEY = 'headline-radar-tr-v1';
+let TR = {}; try { TR = JSON.parse(localStorage.getItem(TRKEY) || '{}'); } catch (e) {}
+let trOff = false, trFails = 0, trBusy = 0, trSaveTimer = null;
+const trQueue = [], trSeen = new Set();
+const trEl = (i) => i.lang === 'ko' ? `<div class="tr" lang="zh-CN" data-tr="${esc(i.title)}">${esc(TR[i.title] || '')}</div>` : '';
+function trSave() {
+  clearTimeout(trSaveTimer);
+  trSaveTimer = setTimeout(() => { try { const keys = Object.keys(TR); if (keys.length > 3000) for (const k of keys.slice(0, keys.length - 3000)) delete TR[k]; localStorage.setItem(TRKEY, JSON.stringify(TR)); } catch (e) {} }, 800);
+}
+function trFill(t) { for (const el of document.querySelectorAll('.tr')) if (el.dataset.tr === t && !el.textContent) el.textContent = TR[t]; }
+function trNote(msg) { const el = $('#trNote'); if (el) el.textContent = msg; }
+async function trWork() {
+  if (trOff || trBusy >= 4 || !trQueue.length) return;
+  trBusy++;
+  const t = trQueue.shift();
+  try {
+    const r = await fetch('api/tr?t=' + encodeURIComponent(t));
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.zh) { TR[t] = d.zh; trFails = 0; trFill(t); trSave(); }
+    else if (r.status === 501 || r.status === 404) { trOff = true; trNote('韩文翻译未启用'); }
+    else if (r.status !== 400 && ++trFails >= 4) { trOff = true; trNote('韩文翻译暂停：今天的翻译额度可能已用完'); }
+  } catch (e) { if (++trFails >= 4) { trOff = true; trNote('韩文翻译暂时连不上'); } }
+  trBusy--;
+  trWork();
+}
+function trScan() {
+  if (trOff) return;
+  let n = 0;
+  for (const el of document.querySelectorAll('.tr:empty')) {
+    const t = el.dataset.tr;
+    if (TR[t]) { el.textContent = TR[t]; continue; }
+    if (trSeen.has(t) || n >= 160) continue;
+    trSeen.add(t); trQueue.push(t); n++;
+  }
+  for (let k = 0; k < 4; k++) trWork();
 }
 
 /* ---------- 数据 ---------- */
@@ -438,7 +485,7 @@ function renderStories(A) {
     const cs = clusters(A.W.filter((i) => i.lang === lang));
     $(el).innerHTML = cs.length ? cs.map((c) => {
       const head = c.list.reduce((p, q) => (q.ts > p.ts ? q : p));
-      return `<div class="story"><div class="t"><span class="heat num" title="热度">${c.heat.toFixed(1)}</span><a href="${esc(head.link)}" target="_blank" rel="noopener">${esc(head.title)}</a></div>
+      return `<div class="story"><div class="t"><span class="heat num" title="热度">${c.heat.toFixed(1)}</span><a href="${esc(head.link)}" target="_blank" rel="noopener">${esc(head.title)}</a></div>${trEl(head)}
       <div class="m num">${c.srcs} 家媒体，${c.list.length} 条报道，首发 ${hm(c.first)}，最新 ${hm(c.last)}；${esc([...new Set(c.list.map((i) => i.src))].slice(0, 4).join('、'))}</div></div>`;
     }).join('') : '<p class="note">这个周期里还没有被两家以上媒体同时报道的事件。</p>';
   }
@@ -452,7 +499,7 @@ function renderKw(A) {
     const top = [...cur].filter(([, c]) => c >= 2).sort((x, y) => y[1] - x[1]).slice(0, 12), max = top[0]?.[1] || 1, hasPrev = prev.size > 0;
     $(el).innerHTML = top.length ? `<table><thead><tr><th>词语</th><th style="width:38%">出现条数</th><th class="r">涨跌</th></tr></thead><tbody>` + top.map(([w, c]) => {
       const p = prev.get(w) || 0, d = !hasPrev ? '<span class="note">—</span>' : p === 0 ? '<span class="up">新上榜</span>' : dHtml((c - p) / p);
-      return `<tr><td><button class="kw" data-kw="${esc(w)}">${esc(w)}</button></td><td><div style="display:flex;align-items:center;gap:6px"><div class="bar" style="width:${c / max * 100}%;background:var(--${lang})"></div><span class="num">${c}</span></div></td><td class="r num">${d}</td></tr>`;
+      return `<tr><td><button class="kw" data-kw="${esc(w)}">${esc(w)}</button>${lang === 'ko' && /[\uac00-\ud7a3]/.test(w) ? `<span class="tr inline" data-tr="${esc(w)}">${esc(TR[w] || '')}</span>` : ''}</td><td><div style="display:flex;align-items:center;gap:6px"><div class="bar" style="width:${c / max * 100}%;background:var(--${lang})"></div><span class="num">${c}</span></div></td><td class="r num">${d}</td></tr>`;
     }).join('') + '</tbody></table>' : '<p class="note">头条数量还不够，暂时排不出榜单。</p>';
   }
 }
@@ -495,7 +542,7 @@ function renderSrc() {
 /* ---------- 时间线 ---------- */
 function filtered(A) {
   const lang = $('#fLang').value, topic = $('#fTopic').value, region = $('#fRegion').value, q = $('#fQ').value.trim().toLowerCase(), qs = q && t2s(q);
-  return A.W.filter((i) => (!lang || i.lang === lang) && (!topic || i.topic === topic) && (!region || i.region === region) && (!q || i.n.toLowerCase().includes(qs) || i.title.toLowerCase().includes(q) || i.src.toLowerCase().includes(q)));
+  return A.W.filter((i) => (!lang || i.lang === lang) && (!topic || i.topic === topic) && (!region || i.region === region) && (!q || i.n.toLowerCase().includes(qs) || i.title.toLowerCase().includes(q) || i.src.toLowerCase().includes(q) || (TR[i.title] || '').includes(q)));
 }
 function renderTl(A) {
   const L = filtered(A);
@@ -506,11 +553,12 @@ function renderTl(A) {
   for (const i of L.slice(0, LIMIT)) {
     const k = Math.floor(i.ts / H);
     if (k !== cur) { cur = k; const d = new Date(k * H); html += `<div class="hour num"><span>${d.getMonth() + 1}月${d.getDate()}日 ${pad(d.getHours())}:00–${pad((d.getHours() + 1) % 24)}:00</span><span>${hourCount.get(k)} 条</span></div>`; }
-    html += `<article class="it" data-lang="${i.lang}"><time class="num" datetime="${new Date(i.ts).toISOString()}">${hm(i.ts)}</time><div><a class="t" href="${esc(i.link)}" target="_blank" rel="noopener" lang="${i.lang}">${esc(i.title)}</a>
+    html += `<article class="it" data-lang="${i.lang}"><time class="num" datetime="${new Date(i.ts).toISOString()}">${hm(i.ts)}</time><div><a class="t" href="${esc(i.link)}" target="_blank" rel="noopener" lang="${i.lang}">${esc(i.title)}</a>${trEl(i)}
       <div class="m"><span class="chip ${i.lang}">${LANG[i.lang]}</span><span>${esc(i.src)}</span><span>${esc(i.region)}</span><span class="tag">${i.topic}</span>${i.sent ? `<span class="${i.sent > 0 ? 'up' : 'down'}">${i.sent > 0 ? '＋正面' : '－负面'}</span>` : ''}</div></div></article>`;
   }
   if (L.length > LIMIT) html += `<button class="btn more" id="more">再显示 120 条（还有 ${L.length - LIMIT} 条）</button>`;
   $('#tl').innerHTML = html;
+  trScan();
 }
 
 let LAST = null;
@@ -553,7 +601,7 @@ function reportHtml(A, L) {
   const sections = names.map((n, k) => {
     const rows = L.filter((i) => i.topic === n);
     return `<h2 ${k ? '' : 'class="first"'}>${n}（${rows.length} 条）</h2><table><thead><tr><th style="width:15%">发布时间</th><th style="width:6%">语言</th><th>标题</th><th style="width:20%">媒体</th></tr></thead><tbody>` +
-      rows.map((i) => `<tr><td>${ymd(i.ts).slice(5)} ${hm(i.ts)}</td><td>${LANG[i.lang]}</td><td><a href="${esc(i.link)}">${esc(i.title)}</a></td><td>${esc(i.src)}（${esc(i.region)}）</td></tr>`).join('') + '</tbody></table>';
+      rows.map((i) => `<tr><td>${ymd(i.ts).slice(5)} ${hm(i.ts)}</td><td>${LANG[i.lang]}</td><td><a href="${esc(i.link)}">${esc(i.title)}</a>${TR[i.title] ? '<br><span style="color:#555">' + esc(TR[i.title]) + '</span>' : ''}</td><td>${esc(i.src)}（${esc(i.region)}）</td></tr>`).join('') + '</tbody></table>';
   }).join('');
   return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>头条雷达 ${ymd(A.b)}</title><style>
   @page{size:A4;margin:18mm 15mm}body{font-family:"Microsoft YaHei","PingFang SC","Malgun Gothic",sans-serif;font-size:10.5pt;color:#111;line-height:1.5}
@@ -569,7 +617,7 @@ $('#dl').addEventListener('click', (e) => {
   const A = LAST, L = filtered(A), base = `头条雷达_${ymd(A.b)}_${WINNAME[WIN]}`;
   if (b.dataset.dl === 'csv') {
     const q = (v) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
-    const rows = [['发布时间', '语言', '话题', '标题', '媒体', '地区', '情绪', '含风险词', '链接'], ...L.map((i) => [ymd(i.ts) + ' ' + hm(i.ts), i.lang === 'zh' ? '中文' : '韩文', i.topic, i.title, i.src, i.region, i.sent > 0 ? '正面' : i.sent < 0 ? '负面' : '中性', i.tense ? '是' : '否', i.link])];
+    const rows = [['发布时间', '语言', '话题', '标题', '中文翻译', '媒体', '地区', '情绪', '含风险词', '链接'], ...L.map((i) => [ymd(i.ts) + ' ' + hm(i.ts), i.lang === 'zh' ? '中文' : '韩文', i.topic, i.title, TR[i.title] || '', i.src, i.region, i.sent > 0 ? '正面' : i.sent < 0 ? '负面' : '中性', i.tense ? '是' : '否', i.link])];
     saveFile(base + '.csv', 'text/csv;charset=utf-8', '\ufeff' + rows.map((r) => r.map(q).join(',')).join('\r\n'));
   } else if (b.dataset.dl === 'doc') {
     saveFile(base + '.doc', 'application/msword', '\ufeff' + reportHtml(A, L));
