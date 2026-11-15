@@ -16,13 +16,9 @@ export const FEEDS = [
   { id: 'g-cn', name: 'Google新闻·大陆版头条', lang: 'zh', region: '中国大陆', agg: true, url: G('zh-CN', 'CN', 'CN:zh-Hans') },
   { id: 'g-tw', name: 'Google新闻·台湾版头条', lang: 'zh', region: '台湾', agg: true, url: G('zh-TW', 'TW', 'TW:zh-Hant') },
   { id: 'g-hk', name: 'Google新闻·香港版头条', lang: 'zh', region: '香港', agg: true, url: G('zh-HK', 'HK', 'HK:zh-Hant') },
-  { id: 'g-sg', name: 'Google新闻·新加坡版头条', lang: 'zh', region: '新加坡', agg: true, url: G('zh-CN', 'SG', 'SG:zh-Hans') },
-  { id: 'g-my', name: 'Google新闻·马来西亚版头条', lang: 'zh', region: '马来西亚', agg: true, url: G('zh-CN', 'MY', 'MY:zh-Hans') },
-  { id: 'g-us', name: 'Google新闻·美国中文版头条', lang: 'zh', region: '北美', agg: true, url: G('zh-CN', 'US', 'US:zh-Hans') },
 
   // ---------- 中文 · 媒体直连 ----------
   { id: 'chinanews', name: '中国新闻网', lang: 'zh', region: '中国大陆', tz: 8, url: 'https://www.chinanews.com.cn/rss/scroll-news.xml' },
-  { id: 'ftchinese', name: 'FT中文网', lang: 'zh', region: '国际', tz: 8, url: 'https://www.ftchinese.com/rss/news' },
   { id: 'bbc-zh', name: 'BBC中文', lang: 'zh', region: '国际', url: 'https://feeds.bbci.co.uk/zhongwen/simp/rss.xml' },
   { id: 'nyt-zh', name: '纽约时报中文网', lang: 'zh', region: '国际', url: 'https://cn.nytimes.com/rss/' },
   { id: 'dw-zh', name: '德国之声中文', lang: 'zh', region: '国际', url: 'https://rss.dw.com/rdf/rss-chi-all' },
@@ -41,6 +37,13 @@ export const FEEDS = [
   { id: 's-zaobao', name: '联合早报', lang: 'zh', region: '新加坡', agg: true, fixed: true, url: S('zaobao.com.sg', ...CN) },
   { id: 's-udn', name: '联合新闻网', lang: 'zh', region: '台湾', agg: true, fixed: true, url: S('udn.com', ...TW) },
   { id: 's-mingpao', name: '明报', lang: 'zh', region: '香港', agg: true, fixed: true, url: S('mingpao.com', ...HK) },
+  { id: 's-8world', name: '8视界', lang: 'zh', region: '新加坡', agg: true, fixed: true, url: S('8world.com', ...CN) },
+  { id: 's-sinchew', name: '星洲日报', lang: 'zh', region: '马来西亚', agg: true, fixed: true, url: S('sinchew.com.my', ...CN) },
+  { id: 's-oriental', name: '东方日报', lang: 'zh', region: '马来西亚', agg: true, fixed: true, url: S('orientaldaily.com.my', ...CN) },
+  { id: 's-chinapress', name: '中国报', lang: 'zh', region: '马来西亚', agg: true, fixed: true, url: S('chinapress.com.my', ...CN) },
+  { id: 's-enanyang', name: '南洋商报', lang: 'zh', region: '马来西亚', agg: true, fixed: true, url: S('enanyang.my', ...CN) },
+  { id: 's-worldjournal', name: '世界日报', lang: 'zh', region: '北美', agg: true, fixed: true, url: S('worldjournal.com', ...TW) },
+  { id: 's-ftchinese', name: 'FT中文网', lang: 'zh', region: '国际', agg: true, fixed: true, url: S('ftchinese.com', ...CN) },
   { id: 's-hk01', name: '香港01', lang: 'zh', region: '香港', agg: true, fixed: true, url: S('hk01.com', ...HK) },
 
   // ---------- 韩文 · 聚合头条 ----------
@@ -110,7 +113,7 @@ export function parseDate(raw, tz) {
 }
 
 // 不算头条的条目：图片稿、讣告、栏目页、记者主页、专栏副刊、广告，以及语言不对的标题
-const JUNK = /^[\[［【(（]\s*(사진|포토|화보|부고|인사|표|쇼츠|영상|게시판|알림|運勢|星座)[^\]］】)）]*[\]］】)）]|^분야별 뉴스$|^.{2,8}\s(기자|앵커|라이브|특파원)$|다시보기$|作家專欄|副刊|短信推|之家$|^(Home|首頁|首页)$/i;
+const JUNK = /^[\[［【(（]\s*(사진|포토|화보|부고|인사|표|쇼츠|영상|게시판|알림|運勢|星座)[^\]］】)）]*[\]］】)）]|^분야별 뉴스$|^.{2,8}\s(기자|앵커|라이브|특파원)$|다시보기$|作家專欄|副刊|短信推|之家$|头条抢鲜看|^FT ?金融时报$|分類廣告|分类广告|^(Home|首頁|首页)$/i;
 export function keep(title, lang) {
   if (JUNK.test(title)) return false;
   const chars = [...title.replace(/[\s\d\p{P}\p{S}]/gu, '')];
@@ -150,6 +153,7 @@ export function parseFeed(xml, feed, now = Date.now()) {
     }
     const rawTitle = title;
     title = title.replace(/\s+-\s+\d{8}\s+-\s+.*$/, '').trim();   // 明报：标题 - 20261115 - 栏目 - 每日明报
+    if (feed.fixed) title = title.replace(/\s*[|｜]\s*[^|｜]{1,8}$/, '').trim();   // “标题 | e南洋”这类站名尾巴
     if (JUNK.test(rawTitle) || !keep(title, feed.lang)) { why.junk++; continue; }
     let desc = feed.agg ? '' : clean(tag(b, ['description', 'summary', 'content:encoded'])).slice(0, 160);
     if (desc === title) desc = '';
