@@ -431,7 +431,7 @@ function clusters(items) {
   return [...g.values()].map((list) => {
     const srcs = new Set(list.map((i) => i.src)), last = Math.max(...list.map((i) => i.ts)), first = Math.min(...list.map((i) => i.ts));
     return { list, srcs: srcs.size, last, first, heat: srcs.size * Math.pow(0.5, (now - last) / (6 * H)) + list.length * 0.1 };
-  }).filter((c) => c.srcs >= 2).sort((x, y) => y.heat - x.heat).slice(0, 6);
+  }).filter((c) => c.srcs >= 2).sort((x, y) => y.heat - x.heat).slice(0, 10);
 }
 function renderStories(A) {
   for (const [lang, el] of [['zh', '#stZh'], ['ko', '#stKo']]) {

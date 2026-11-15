@@ -118,12 +118,16 @@ export function keep(title, lang) {
   if (JUNK.test(title)) return false;
   const chars = [...title.replace(/[\s\d\p{P}\p{S}]/gu, '')];
   if (chars.length < 5) return false;
+  if (chars.filter((c) => /[\u4e00-\u9fff\uac00-\ud7a3]/.test(c)).length < 6) return false;   // 太短，多半是栏目名
   const re = lang === 'ko' ? /[\uac00-\ud7a3]/ : /[\u4e00-\u9fff]/;
   const share = chars.filter((c) => re.test(c)).length / chars.length;
   if (share < (lang === 'ko' ? 0.3 : 0.4)) return false;            // 英文等其他语言的标题
   if (/[\u3040-\u30ff]/.test(title)) return false;                  // 日文
   return true;
 }
+
+// 聚合头条里同一家媒体的不同写法，统一成一个名字
+const ALIAS = { 'UDN': '联合新闻网', '聯合新聞網': '联合新闻网', '自由時報': '自由时报', '自由時報電子報': '自由时报', '中央社 CNA': '中央社', '中央通訊社': '中央社', '明報新聞網': '明报', '聯合早報': '联合早报', '香港電台': '香港电台', 'ThePaper.cn': '澎湃新闻', '한겨레': '한겨레 韩民族日报', '중앙일보': '중앙일보 中央日报', '한국일보': '한국일보 韩国日报', '국민일보': '국민일보 国民日报', '조선일보': '조선일보 朝鲜日报', '동아일보': '동아일보 东亚日报', '경향신문': '경향신문 京乡新闻', '연합뉴스': '연합뉴스 韩联社', '매일경제': '매일경제 每日经济', '한국경제': '한국경제 韩国经济', 'JTBC': 'JTBC 뉴스', '서울신문': '서울신문 首尔新闻', '세계일보': '세계일보 世界日报' };
 
 export function parseFeed(xml, feed, now = Date.now()) {
   const blocks = xml.match(/<(item|entry)(?:\s[^>]*)?>[\s\S]*?<\/\1>/gi) || [];
@@ -146,14 +150,19 @@ export function parseFeed(xml, feed, now = Date.now()) {
     if (feed.agg) {
       const s = clean(tag(b, ['source']));
       if (s) {
-        if (feed.fixed) { src = feed.name; via = 'Google新闻'; } else { src = s; via = feed.name; }
+        if (feed.fixed) { src = feed.name; via = 'Google新闻'; } else { src = ALIAS[s] || s; via = feed.name; }
         const suffix = ' - ' + s;
         if (title.endsWith(suffix)) title = title.slice(0, -suffix.length).trim();
       }
     }
     const rawTitle = title;
     title = title.replace(/\s+-\s+\d{8}\s+-\s+.*$/, '').trim();   // 明报：标题 - 20261115 - 栏目 - 每日明报
-    if (feed.fixed) title = title.replace(/\s*[|｜]\s*[^|｜]{1,8}$/, '').trim();   // “标题 | e南洋”这类站名尾巴
+    // “标题 | 國際焦點 | 世界新聞網”“标题 - 国内”这类栏目名、站名尾巴，逐段去掉
+    if (feed.agg) for (let k = 0; k < 3; k++) {
+      const cut = title.replace(/\s*[|｜]\s*[^|｜]{1,8}$/, '').replace(/\s+-\s+[^\s-]{1,8}$/, '').trim();
+      if (cut === title || [...cut].length < 8) break;
+      title = cut;
+    }
     if (JUNK.test(rawTitle) || !keep(title, feed.lang)) { why.junk++; continue; }
     let desc = feed.agg ? '' : clean(tag(b, ['description', 'summary', 'content:encoded'])).slice(0, 160);
     if (desc === title) desc = '';
