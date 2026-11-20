@@ -69,7 +69,10 @@ export const FEEDS = [
 ];
 
 const CACHE_SECONDS = 300;
-const FETCH_TIMEOUT_MS = 7000;
+const FETCH_TIMEOUT_MS = 8000;      // 单个新闻源的超时，从真正开始请求时计时
+const CONCURRENCY = 6;              // Cloudflare 每次请求最多同时 6 个外连，多出来的会排队
+const STALE_SECONDS = 6 * 3600;     // 某个源这次失败时，沿用它 6 小时内最近一次成功的结果
+const FORCE_MIN_SECONDS = 90;       // “立即刷新”距上次抓取不到 90 秒时直接用缓存，避免频繁请求被 Google 限流（HTTP 429）
 const MAX_PER_FEED = 100;
 const MAX_AGE_HOURS = 72;
 
@@ -175,6 +178,27 @@ export function parseFeed(xml, feed, now = Date.now()) {
   return out;
 }
 
+const feedKey = (origin, id) => new Request(`${origin}/__feed-cache/${encodeURIComponent(id)}`);
+async function saveGood(cache, origin, feed, items, now) {
+  if (!cache || !items.length) return;
+  const body = JSON.stringify({ at: now, items });
+  try { await cache.put(feedKey(origin, feed.id), new Response(body, { headers: { 'content-type': 'application/json', 'cache-control': `public, s-maxage=${STALE_SECONDS}` } })); } catch {}
+}
+async function loadGood(cache, origin, feed) {
+  if (!cache) return null;
+  try { const r = await cache.match(feedKey(origin, feed.id)); return r ? await r.json() : null; } catch { return null; }
+}
+const hhmm = (t) => { const d = new Date(t + 8 * 3600e3); return String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0'); };
+
+// 最多同时跑 limit 个任务，其余排队
+async function pool(list, limit, fn) {
+  const out = new Array(list.length);
+  let next = 0;
+  async function worker() { while (next < list.length) { const i = next++; out[i] = await fn(list[i], i); } }
+  await Promise.all(Array.from({ length: Math.min(limit, list.length) }, worker));
+  return out;
+}
+
 async function loadFeed(feed, now) {
   const started = Date.now();
   const ctl = new AbortController();
@@ -214,8 +238,25 @@ function status(feed, ok, items, ms, error) {
   return { id: feed.id, name: feed.name, lang: feed.lang, region: feed.region, agg: !!feed.agg, ok, count: items.length, ms, newest, error: error || null };
 }
 
-export async function collect(now = Date.now()) {
-  const results = await Promise.all(FEEDS.map((f) => loadFeed(f, now)));
+export async function collect(now = Date.now(), ctx = {}) {
+  const { cache = null, origin = '', waitUntil = null } = ctx;
+  // 先排慢的、远的源也不会被前面的源拖到超时：计时只在轮到它时才开始
+  const results = await pool(FEEDS, CONCURRENCY, async (f) => {
+    const r = await loadFeed(f, now);
+    if (r.meta.ok && r.items.length) {
+      const p = saveGood(cache, origin, f, r.items, now);
+      if (waitUntil) waitUntil(p);
+    } else if (!r.meta.ok) {
+      const old = await loadGood(cache, origin, f);
+      const keep = old ? old.items.filter((i) => now - i.ts <= MAX_AGE_HOURS * 3600000) : [];
+      if (keep.length) {
+        r.items = keep;
+        r.meta = { ...r.meta, count: keep.length, newest: keep.reduce((a, i) => Math.max(a, i.ts), 0) || null, stale: true, staleAt: old.at,
+          error: `${r.meta.error}，沿用 ${hhmm(old.at)} 的结果` };
+      }
+    }
+    return r;
+  });
   const seen = new Set();
   const items = [];
   for (const r of results) {
@@ -233,17 +274,24 @@ export async function collect(now = Date.now()) {
 export async function onRequestGet(context) {
   const cache = typeof caches !== 'undefined' && caches.default ? caches.default : null;
   const cacheKey = new Request(new URL('/api/news', context.request.url).toString());
-  const force = new URL(context.request.url).searchParams.has('fresh');
-  if (cache && !force) {
+  const url = new URL(context.request.url);
+  const force = url.searchParams.has('fresh');
+  if (cache) {
     const hit = await cache.match(cacheKey);
-    if (hit) return hit;
+    if (hit) {
+      if (!force) return hit;
+      // 强制刷新也有最短间隔
+      const at = Number(hit.headers.get('x-generated-at') || 0);
+      if (Date.now() - at < FORCE_MIN_SECONDS * 1000) return hit;
+    }
   }
-  const data = await collect();
+  const data = await collect(Date.now(), { cache, origin: url.origin, waitUntil: context.waitUntil?.bind(context) });
   const res = new Response(JSON.stringify(data), {
     headers: {
       'content-type': 'application/json; charset=utf-8',
       'cache-control': `public, max-age=60, s-maxage=${CACHE_SECONDS}`,
       'access-control-allow-origin': '*',
+      'x-generated-at': String(data.generatedAt),
     },
   });
   if (cache && data.items.length) context.waitUntil?.(cache.put(cacheKey, res.clone()));

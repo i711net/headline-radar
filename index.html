@@ -108,7 +108,7 @@ td.r,th.r{text-align:right}
 .story .t{font:600 15px/1.45 var(--serif)}
 .story .m{font-size:12.5px;color:var(--mute);margin-top:2px}
 .heat{display:inline-block;min-width:34px;text-align:center;font-weight:700;border-radius:4px;padding:1px 5px;background:var(--hl);color:var(--ink);margin-right:8px;font-size:12.5px}
-.ok{color:var(--down)}.bad{color:var(--up)}
+.ok{color:var(--down)}.bad{color:var(--up)}.warn{color:var(--warn)}
 #tip{position:fixed;z-index:9;pointer-events:none;background:var(--ink);color:var(--panel);padding:6px 9px;border-radius:6px;font-size:12.5px;line-height:1.5;max-width:260px;display:none;white-space:pre-line}
 .method{color:var(--ink2);font-size:13px;line-height:1.7}
 .method b{color:var(--ink)}
@@ -493,10 +493,10 @@ function renderFmt(A) {
   $('#fmt').innerHTML = `<table><thead><tr><th>特征</th><th class="r">中文</th><th class="r">韩文</th></tr></thead><tbody>` + names.map((nm, i) => `<tr><td>${nm}</td><td class="r num">${z[i]}</td><td class="r num">${k[i]}</td></tr>`).join('') + '</tbody></table>';
 }
 function renderSrc() {
-  const ok = SOURCES.filter((s) => s.ok && s.count).length;
-  $('#srcNote').textContent = SOURCES.length ? `${SOURCES.length} 个新闻源，本轮 ${ok} 个有内容` : '';
+  const ok = SOURCES.filter((s) => s.ok && s.count).length, stale = SOURCES.filter((s) => s.stale).length;
+  $('#srcNote').textContent = SOURCES.length ? `${SOURCES.length} 个新闻源，本轮 ${ok} 个有内容` + (stale ? `，${stale} 个这次没连上、沿用了上次的结果` : '') : '';
   $('#src').innerHTML = SOURCES.length ? `<table><thead><tr><th>新闻源</th><th>地区</th><th>状态</th><th class="r">条数</th><th class="r">耗时</th><th class="r">最新一条</th></tr></thead><tbody>` + SOURCES.map((s) =>
-    `<tr><td><span class="chip ${s.lang}">${LANG[s.lang]}</span> ${esc(s.name)}</td><td>${esc(s.region)}</td><td>${s.ok ? (s.count ? '<span class="ok">✓ 正常</span>' : `<span class="note">${esc(s.error || '无近期条目')}</span>`) : `<span class="bad">✕ ${esc(s.error || '失败')}</span>`}</td><td class="r num">${s.count}</td><td class="r num">${(s.ms / 1000).toFixed(1)}秒</td><td class="r num">${s.newest ? hm(s.newest) : '—'}</td></tr>`).join('') + '</tbody></table>' : '<p class="note">还没有拿到新闻源状态。</p>';
+    `<tr><td><span class="chip ${s.lang}">${LANG[s.lang]}</span> ${esc(s.name)}</td><td>${esc(s.region)}</td><td>${s.ok ? (s.count ? '<span class="ok">✓ 正常</span>' : `<span class="note">${esc(s.error || '无近期条目')}</span>`) : s.stale ? `<span class="warn">⚠ ${esc(s.error)}</span>` : `<span class="bad">✕ ${esc(s.error || '失败')}</span>`}</td><td class="r num">${s.count}</td><td class="r num">${(s.ms / 1000).toFixed(1)}秒</td><td class="r num">${s.newest ? hm(s.newest) : '—'}</td></tr>`).join('') + '</tbody></table>' : '<p class="note">还没有拿到新闻源状态。</p>';
 }
 
 /* ---------- 时间线 ---------- */
