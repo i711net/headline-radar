@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>韩国门户新闻导入 · 头条雷达</title>
+<meta name="description" content="把 Naver、Daum 国际新闻版块的内容导入、整理，导出给 AI 做事实核对。全部在浏览器里完成。">
+<style>
+:root{
+  color-scheme:light;
+  --page:#eef1f4; --panel:#fcfcfb; --ink:#16202e; --ink2:#465264; --mute:#6b7686; --rule:#d8dde4; --rule2:#e8ebef;
+  --zh:#eb6834; --ko:#2a78d6; --up:#cf3a3a; --down:#0a8a66; --warn:#b26a00; --hl:#fff3c4; --pick:rgba(42,120,214,.07);
+  --serif:"Songti SC","Noto Serif CJK SC","Source Han Serif SC","Noto Serif SC","AppleMyungjo","Batang",SimSun,serif;
+  --serif-ko:"AppleMyungjo","Batang","Noto Serif CJK KR","Noto Serif KR",var(--serif);
+  --sans:system-ui,-apple-system,"PingFang SC","Microsoft YaHei","Apple SD Gothic Neo","Malgun Gothic","Noto Sans CJK SC",sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{color-scheme:dark;--page:#12161c;--panel:#1a1f27;--ink:#eef0f3;--ink2:#c2c8d1;--mute:#939cab;--rule:#333b47;--rule2:#272e38;
+    --zh:#d95926;--ko:#3987e5;--up:#e66767;--down:#2fb38c;--warn:#d9a13a;--hl:#4a4320;--pick:rgba(57,135,229,.12);}
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--page);color:var(--ink);font:14px/1.55 var(--sans);-webkit-text-size-adjust:100%}
+a{color:inherit;text-decoration:none}
+a:hover{text-decoration:underline}
+button,select,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--ko);outline-offset:2px}
+[hidden]{display:none!important}
+.num{font-variant-numeric:tabular-nums}
+.note{color:var(--mute);font-size:12.5px}
+
+/* 报头 */
+.mast{padding:20px clamp(14px,3vw,36px) 14px}
+.back{color:var(--ink2);font-size:13px}
+.mast h1{font:700 clamp(26px,4vw,40px)/1.15 var(--serif);letter-spacing:.03em;margin:6px 0 0}
+.mast .sub{color:var(--ink2);margin:6px 0 0;max-width:50em}
+
+/* 通用部件 */
+.wrap{display:grid;grid-template-columns:minmax(320px,440px) minmax(0,1fr);gap:18px;padding:4px clamp(14px,3vw,36px) 48px;align-items:start}
+.col{display:grid;gap:18px;min-width:0}
+.panel{background:var(--panel);border:1px solid var(--rule);border-radius:10px;min-width:0}
+.panel>header{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline;padding:13px 16px 9px;border-bottom:1px solid var(--rule2)}
+.panel h2{font:700 17px/1.3 var(--serif);margin:0}
+.panel h3{font:600 13px/1.4 var(--sans);color:var(--ink2);margin:16px 0 4px}
+.panel .body{padding:12px 16px 16px}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:8px;overflow:hidden;background:var(--panel)}
+.seg button{border:0;background:none;padding:7px 14px;cursor:pointer;color:var(--ink2)}
+.seg button+button{border-left:1px solid var(--rule)}
+.seg button[aria-pressed=true]{background:var(--ink);color:var(--panel)}
+.btn{display:inline-block;border:1px solid var(--rule);background:var(--panel);border-radius:8px;padding:7px 12px;cursor:pointer;line-height:1.3}
+.btn:hover{border-color:var(--mute)}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:var(--panel);font-weight:600}
+.btn.small{padding:4px 9px;font-size:12.5px}
+.btn.danger{color:var(--up)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.link{border:0;background:none;padding:0;color:var(--ko);cursor:pointer}
+.link:hover{text-decoration:underline}
+.link.danger{color:var(--up)}
+input[type=text],input[type=search],input[type=url],input[type=datetime-local],select,textarea{border:1px solid var(--rule);background:var(--panel);border-radius:7px;padding:6px 8px;min-width:0}
+textarea{resize:vertical;line-height:1.5}
+.tag{display:inline-block;border:1px solid var(--rule);border-radius:4px;padding:0 6px;font-size:11.5px;line-height:18px;color:var(--ink2);white-space:nowrap}
+.tag.series{border-style:dashed}
+.portal{display:inline-block;font-size:11.5px;line-height:18px;padding:0 6px;border-radius:4px;background:var(--ink2);color:var(--panel);white-space:nowrap}
+
+/* 导入 */
+.row2{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+.row2 .lbl{color:var(--ink2);font-size:13px;min-width:2.5em}
+#pasteText{width:100%;min-height:230px;font-size:13px}
+.drop{display:block;border:1.5px dashed var(--rule);border-radius:10px;padding:18px 14px;color:var(--ink2);cursor:pointer;text-align:center}
+.drop:hover{border-color:var(--mute)}
+.drop input{display:block;margin:0 auto 8px;max-width:100%}
+.files{list-style:none;margin:10px 0 0;padding:0;font-size:13px}
+.files li{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-top:1px solid var(--rule2)}
+.actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px}
+.howto{margin:12px 0 0;padding-left:18px;color:var(--ink2);font-size:13px}
+.howto li{margin:2px 0}
+
+/* 预览 */
+.pv{padding:9px 0;border-top:1px solid var(--rule2);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.pv:first-child{border-top:0}
+.t{font:600 14.5px/1.45 var(--serif-ko);word-break:keep-all;overflow-wrap:anywhere}
+.sum{color:var(--ink2);font-size:13px;margin:3px 0 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:keep-all;overflow-wrap:anywhere}
+.m{color:var(--mute);font-size:12.5px;margin-top:4px;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center}
+.x{border:0;background:none;color:var(--mute);cursor:pointer;padding:0 6px;border-radius:6px;font-size:18px;line-height:24px;height:26px}
+.x:hover{background:var(--page);color:var(--ink)}
+.pvlist{max-height:420px;overflow:auto;padding-right:4px}
+.unk{padding:9px 0;border-top:1px solid var(--rule2);display:grid;gap:6px}
+.unk textarea{width:100%;font-size:13px}
+.unk .ctl{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.unk .ctl input{flex:1 1 140px}
+.unklist{max-height:360px;overflow:auto;padding-right:4px}
+.msg{margin:10px 0 0;padding:8px 10px;border-radius:8px;background:var(--hl);color:var(--ink);font-size:13px}
+.msg.err{background:none;border:1px solid var(--up)}
+
+/* 统计 */
+.stats{display:grid;grid-template-columns:minmax(150px,200px) minmax(0,1.4fr) minmax(0,1fr);gap:18px}
+.big{font:600 40px/1.1 var(--sans);margin:4px 0}
+table{width:100%;border-collapse:collapse}
+td{padding:4px 0;vertical-align:middle;font-size:13px}
+td.n{text-align:right;width:3.5em;color:var(--ink2)}
+td.k{width:42%;padding-right:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:0}
+.bar{height:8px;border-radius:0 4px 4px 0;background:var(--ko);min-width:2px}
+
+/* 导出 */
+.fmt{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;padding:9px 0;border-top:1px solid var(--rule2)}
+.fmt:first-of-type{border-top:0}
+.fmt b{font-weight:600}
+.fmt small{display:block;color:var(--mute);font-size:12.5px}
+details.peek summary{cursor:pointer;color:var(--ink2);font-size:13px;margin-top:6px}
+details.peek textarea{width:100%;min-height:200px;margin-top:8px;font-size:12.5px}
+
+/* 列表 */
+.filters{display:flex;flex-wrap:wrap;gap:8px;padding:10px 16px;border-bottom:1px solid var(--rule2);align-items:center}
+.filters input[type=search]{flex:1 1 160px}
+.bulk{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:8px 16px;border-bottom:1px solid var(--rule2);font-size:13px;color:var(--ink2)}
+.bulk label{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
+.item{display:grid;grid-template-columns:20px 74px minmax(0,1fr) auto;gap:10px;padding:11px 16px;border-bottom:1px solid var(--rule2);align-items:start}
+.item.picked{background:var(--pick)}
+.item input[type=checkbox]{margin:4px 0 0}
+.when{font-size:12.5px;color:var(--ink2);line-height:1.4}
+.when .u{color:var(--mute)}
+.ops{display:flex;gap:2px}
+.ops button{border:0;background:none;color:var(--mute);cursor:pointer;padding:2px 6px;border-radius:6px;font-size:12.5px}
+.ops button:hover{background:var(--page);color:var(--ink)}
+.empty{padding:28px 16px;color:var(--ink2)}
+.edit{grid-column:2/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}
+.edit label{display:grid;gap:3px;font-size:12.5px;color:var(--ink2)}
+.edit .wide{grid-column:1/-1}
+.edit input,.edit select,.edit textarea{width:100%;color:var(--ink);font-size:13.5px}
+.edit .actions{grid-column:1/-1;margin-top:2px}
+
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:9px 14px;border-radius:8px;font-size:13px;display:none;z-index:9;max-width:calc(100vw - 32px)}
+#toast button{border:0;background:none;color:inherit;text-decoration:underline;cursor:pointer;margin-left:10px;padding:0}
+
+@media (max-width:1180px){.stats{grid-template-columns:1fr 1fr}.stats .total{grid-column:1/-1}}
+@media (max-width:980px){.wrap{grid-template-columns:1fr}}
+@media (max-width:620px){
+  .stats{grid-template-columns:1fr}
+  .item{grid-template-columns:20px minmax(0,1fr) auto}
+  .item .when{grid-column:2;grid-row:1}
+  .item .main{grid-column:2/-1;grid-row:2}
+  .item .ops{grid-column:3;grid-row:1}
+  .edit{grid-column:1/-1;grid-template-columns:1fr}
+  .fmt{grid-template-columns:1fr auto auto}
+}
+</style>
+</head>
+<body>
+
+<div class="mast">
+  <a class="back" href="index.html">← 返回头条雷达</a>
+  <h1>韩国门户新闻导入</h1>
+  <p class="sub">把 Naver、Daum 国际新闻版块的内容粘贴或上传进来，整理成条目，再导出给 AI 核对事实。解析全部在你的浏览器里完成，内容不会上传到任何服务器。</p>
+</div>
+
+<div class="wrap">
+  <div class="col">
+    <section class="panel" aria-labelledby="h-import">
+      <header><h2 id="h-import">导入</h2></header>
+      <div class="body">
+        <div class="row2"><span class="lbl">来源</span>
+          <div class="seg" role="group" aria-label="来源" id="portalSeg">
+            <button data-portal="naver" aria-pressed="true">Naver</button><button data-portal="daum" aria-pressed="false">Daum</button>
+          </div>
+        </div>
+        <div class="row2"><span class="lbl">方式</span>
+          <div class="seg" role="group" aria-label="导入方式" id="modeSeg">
+            <button data-mode="paste" aria-pressed="true">粘贴文本</button><button data-mode="file" aria-pressed="false">上传文件</button>
+          </div>
+        </div>
+        <div id="pasteBox">
+          <textarea id="pasteText" aria-label="粘贴门户网页的文本"></textarea>
+          <ol class="howto" id="howto"></ol>
+        </div>
+        <div id="fileBox" hidden>
+          <label class="drop"><input type="file" id="fileInput" multiple accept=".txt,.html,.htm,text/plain,text/html">
+            选择 .txt 或 .html 文件，可以一次选多个。HTML 是用浏览器“另存为网页”保存的门户页面。</label>
+          <ul class="files" id="fileList"></ul>
+          <p class="note">HTML 文件里的“20분전”这类时间按导入时刻换算。网页如果是很早以前保存的，换算出的时间会比实际偏晚。</p>
+        </div>
+        <div class="actions"><button class="btn primary" id="parseBtn">解析</button><span class="note" id="parseNote"></span></div>
+      </div>
+    </section>
+
+    <section class="panel" id="pvPanel" hidden aria-labelledby="h-pv">
+      <header><h2 id="h-pv">解析结果</h2><span class="note num" id="pvSummary"></span></header>
+      <div class="body">
+        <div id="pvFiles"></div>
+        <div class="pvlist" id="pvItems"></div>
+        <div id="pvUnkWrap">
+          <h3 id="pvUnkTitle"></h3>
+          <p class="note">这些行没能归到任何条目。可以改写后点“转为条目”（第一行作标题，其余作摘要），或删除。确认加入时，剩下的未识别行会被丢弃。</p>
+          <div class="actions" style="margin-top:4px"><button class="link danger" id="unkClear">全部删除</button></div>
+          <div class="unklist" id="pvUnknown"></div>
+        </div>
+        <div class="actions"><button class="btn primary" id="confirmBtn">加入列表</button><button class="btn" id="discardBtn">放弃</button></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="col">
+    <div class="stats">
+      <section class="panel total"><header><h2>总条数</h2></header><div class="body"><div class="big num" id="stTotal">0</div><div class="note num" id="stSplit"></div></div></section>
+      <section class="panel"><header><h2>媒体分布</h2><span class="note">前 10 家</span></header><div class="body" id="stOutlets"></div></section>
+      <section class="panel"><header><h2>栏目分布</h2></header><div class="body" id="stSections"></div></section>
+    </div>
+
+    <section class="panel" aria-labelledby="h-ex">
+      <header><h2 id="h-ex">导出</h2><span class="note" id="exNote"></span></header>
+      <div class="body">
+        <div class="row2"><span class="lbl">范围</span>
+          <div class="seg" role="group" aria-label="导出范围" id="scopeSeg">
+            <button data-scope="picked" aria-pressed="false">勾选的 0 条</button><button data-scope="all" aria-pressed="true">全部 0 条</button>
+          </div>
+        </div>
+        <div class="fmt"><div><b>给 AI 核对的文本</b><small>开头附核对说明，每条写成“序号 媒体｜时间｜标题”，下面是摘要和链接</small></div>
+          <button class="btn small" data-copy="ai">复制</button><button class="btn small" data-dl="ai">下载</button></div>
+        <div class="fmt"><div><b>CSV 表格</b><small>UTF-8 带 BOM，Excel 打开韩文不乱码</small></div>
+          <button class="btn small" data-copy="csv">复制</button><button class="btn small" data-dl="csv">下载</button></div>
+        <div class="fmt"><div><b>JSON</b><small>完整字段，适合给程序或 AI 读取</small></div>
+          <button class="btn small" data-copy="json">复制</button><button class="btn small" data-dl="json">下载</button></div>
+        <details class="peek" id="peek"><summary>预览给 AI 的文本</summary><textarea readonly id="peekText" aria-label="给 AI 的文本预览"></textarea></details>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="h-list">
+      <header><h2 id="h-list">条目列表</h2><span class="note num" id="listNote"></span>
+        <button class="link danger" id="clearAll" style="margin-left:auto">清空全部</button></header>
+      <div class="filters">
+        <select id="fPortal" aria-label="门户"><option value="">全部门户</option><option value="naver">Naver</option><option value="daum">Daum</option></select>
+        <select id="fOutlet" aria-label="媒体"><option value="">全部媒体</option></select>
+        <select id="fSection" aria-label="栏目"><option value="">全部栏目</option></select>
+        <input type="search" id="fQ" placeholder="搜索标题、摘要或媒体" aria-label="关键词">
+      </div>
+      <div class="bulk">
+        <label><input type="checkbox" id="pickAll"> 全选当前列表</label>
+        <button class="link" id="pickNone">取消勾选</button>
+        <button class="link danger" id="delPicked">删除勾选的条目</button>
+      </div>
+      <div id="list"></div>
+    </section>
+  </div>
+</div>
+<datalist id="outletList"></datalist>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   1. 可调整的解析规则
+   门户改版后，通常只需要改这一节：忽略词、栏目标记、时间格式、媒体名、HTML 选择器。
+   ===================================================================== */
+
+// 解析时的长度门槛（字数）
+const LIMITS = {
+  summaryMin: 30,     // 摘要至少这么长
+  summaryLong: 45,    // 达到这个长度，直接当摘要
+  titleMin: 6,        // 标题至少这么长
+  outletMax: 20,      // 媒体名最长这么长
+};
+
+// 时间格式：rel 返回“多久之前”（毫秒），abs 返回首尔时间的时间戳
+const TIME_RULES = [
+  { re: /^방금\s*전?$/, rel: () => 0 },
+  { re: /^(\d+)\s*초\s*전$/, rel: (m) => +m[1] * 1e3 },
+  { re: /^(\d+)\s*분\s*전$/, rel: (m) => +m[1] * 6e4 },
+  { re: /^(\d+)\s*시간\s*전$/, rel: (m) => +m[1] * 36e5 },
+  { re: /^(\d+)\s*일\s*전$/, rel: (m) => +m[1] * 864e5 },
+  { re: /^(\d+)\s*주\s*전$/, rel: (m) => +m[1] * 7 * 864e5 },
+  { re: /^(\d{4})[.\-/]\s*(\d{1,2})[.\-/]\s*(\d{1,2})\.?\s*(오전|오후)?\s*(\d{1,2}):(\d{2})$/, abs: (m) => seoulMs(+m[1], +m[2], +m[3], hour12(m[4], +m[5]), +m[6]) },
+  { re: /^(\d{4})[.\-/]\s*(\d{1,2})[.\-/]\s*(\d{1,2})\.?$/, abs: (m) => seoulMs(+m[1], +m[2], +m[3], 0, 0) },
+  { re: /^(\d{1,2})\.(\d{1,2})\.?\s+(\d{1,2}):(\d{2})$/, abs: (m, now) => seoulMs(seoulParts(now).y, +m[1], +m[2], +m[3], +m[4]) },
+];
+// 媒体名和时间写在同一行时（如 Daum 的“아이뉴스24 2시간 전”），用这个拆开
+const OUTLET_TIME_TAIL = /\s*[·∙ㆍ|]?\s*(방금\s*전|\d+\s*(?:초|분|시간|일|주)\s*전|\d{4}[.\-/]\s*\d{1,2}[.\-/]\s*\d{1,2}\.?\s*(?:오전|오후)?\s*\d{1,2}:\d{2})$/;
+// 媒体名后面跟着的附加字样，比较时去掉
+const OUTLET_SUFFIX = /\s*(언론사\s*선정|언론사\s*구독|구독중|구독|PICK|Pick|원문)$/;
+
+// 常见媒体名。不在表里的媒体名，只要后面紧跟时间或“10 / 이상+”这类数字，也能认出来。
+const OUTLETS = [
+  '연합뉴스', '연합뉴스TV', '뉴스1', '뉴시스', '한국경제', '한국경제TV', '매일경제', 'MBN', '서울경제', '서울경제TV', '헤럴드경제', '아시아경제',
+  '이데일리', '머니투데이', '머니S', '파이낸셜뉴스', '아주경제', '이투데이', '뉴스핌', '조선일보', '조선비즈', '중앙일보', '중앙SUNDAY', '동아일보',
+  '동아사이언스', '한겨레', '한겨레21', '경향신문', '주간경향', '국민일보', '세계일보', '서울신문', '문화일보', '한국일보', '매일신문', '부산일보',
+  '국제신문', '강원일보', '강원도민일보', '경기일보', '대전일보', '광주일보', '전북일보', '경남신문', 'KBS', 'MBC', 'SBS', 'YTN', 'JTBC', '채널A',
+  'TV조선', 'SBS Biz', 'kbc광주방송', 'JIBS', 'CJB청주방송', 'TJB대전방송', 'G1', 'UBC울산방송', 'KNN', '노컷뉴스', 'CBS노컷뉴스', '오마이뉴스',
+  '프레시안', '데일리안', '뉴데일리', '미디어오늘', '기자협회보', '더팩트', '아이뉴스24', '지디넷코리아', 'ZDNET Korea', '전자신문', '디지털타임스',
+  '블로터', '비즈워치', '이코노미스트', '한경비즈니스', '매경이코노미', '주간동아', '신동아', '주간조선', '시사IN', '시사저널', '월간산',
+  '코리아헤럴드', 'The Korea Herald', '코리아중앙데일리', 'Korea JoongAng Daily', 'BBC News 코리아', 'BBC코리아', 'VOA', '자유아시아방송', 'RFA',
+  '헬스조선', '코메디닷컴', '일간스포츠', '스포츠조선', '스포츠서울', '스포츠동아', '스포츠경향', 'OSEN', '엑스포츠뉴스', '스포티비뉴스', '마이데일리',
+  '텐아시아', '스타뉴스', '조이뉴스24', '에너지경제', '인베스트조선', '더스쿠프', '농민신문', '여성신문', '법률신문', '조세일보', '글로벌이코노믹',
+  '펜앤드마이크', '아시아투데이', '쿠키뉴스', '뉴스타파', '시사저널e', '한국경제매거진', '연합인포맥스', '이코노미조선', '비즈니스포스트', '서울파이낸스',
+];
+
+// Naver 规则
+const NAVER_RULES = {
+  // 整行等于这些文字就忽略（一行里用两个以上空格隔开的多个词，如果都在表里也忽略）
+  ignoreExact: [
+    '전체 언론사', '뉴스스탠드', '라이브러리', '세계', '아시아/호주', '미국/중남미', '유럽', '중동/아프리카', '세계 일반',
+    '헤드라인 뉴스', '헤드라인 뉴스 안내', '헤드라인 더보기', '연재보기', '기사 더보기', '동영상뉴스재생시간',
+    'AiRS 추천으로 구성된 뉴스를 제공합니다', '이상+', '이상', '개의 관련뉴스 더보기', '관련뉴스', '언론사 선정', '구독', '구독중',
+    '로그인', '로그아웃', '고객센터', '네이버뉴스', '네이버 뉴스', 'NAVER', '뉴스', '홈', '정치', '경제', '사회', '생활/문화', 'IT/과학',
+    '랭킹', '신문보기', '오피니언', 'TV', '팩트체크', '언론사편집', '엔터', '스포츠', '날씨', '프리미엄', 'MY뉴스', '언론사별', '섹션',
+    '본문 바로가기', '메뉴 바로가기', '검색', '이전', '다음', '닫기', '더보기', '전체보기', '서비스 전체보기', '설정', '알림',
+    'PC버전', '앱 다운로드', '공지사항', '청소년보호정책', '뉴스 운영원칙', '기사배열 책임자', '제휴제안', '오류신고', '뉴스제휴',
+    '언론사 구독 설정', '기사 원문', '연재', '언론사 연재', '오늘의 연재',
+  ],
+  ignoreRe: [
+    /^\d{1,2}\.\d{1,2}\.?\s*\([월화수목금토일]\)$/,           // 11.20(금)
+    /^\d{4}\.\s*\d{1,2}\.\s*\d{1,2}\.?\s*\([월화수목금토일]\)$/, // 2026.11.20.(금)
+    /^AI 뉴스 알고리즘/, /^헤드라인 뉴스/, /^동영상뉴스/, /^AiRS/, /추천으로 구성된 뉴스/,
+    /^\d{1,2}:\d{2}(:\d{2})?$/,                              // 视频时长 01:23
+    /^\d+$/, /^이상\s*\+?$/, /개의?\s*관련\s*뉴스/, /^\d+\s*\/\s*\d+$/,
+    /^(댓글|공감|좋아요)\s*\d*$/, /^언론사\s*(선정|구독)/, /^(기사|사진|영상)\s*더보기$/, /^\[?(포토|사진|영상)\]?$/,
+    /^기사배열\s*책임자/, /^청소년\s*보호\s*책임자/,
+  ],
+  // 跟在媒体名后面的计数、按钮文字（用来辅助认出不在表里的媒体名）
+  counterRe: [/^\d+$/, /^이상\s*\+?$/, /개의?\s*관련\s*뉴스/],
+  // 栏目标记：遇到这一行，之后的条目归入对应栏目
+  sections: [
+    [/^헤드라인 뉴스/, 'headline'],
+    [/^헤드라인 더보기$/, 'unknown'],
+    [/^(언론사\s*|오늘의\s*)?연재(보기)?$/, 'series'],
+    [/AiRS|추천으로 구성된 뉴스/, 'latest'],
+    [/^기사 더보기$/, 'unknown'],
+  ],
+  // 遇到这些行就停止解析（页脚）
+  stop: [/^Copyright/i, /^ⓒ\s*NAVER/i, /^이용약관$/, /^개인정보처리방침$/, /^책임의 한계와 법적고지$/, /^네이버\(주\)/],
+  defaultSection: 'unknown',
+  splitBlocks: false,       // Naver 不依赖空行分块
+  pick: 'position',          // 标题、摘要按位置取：媒体名前一行是摘要，再前一行是标题
+};
+
+// Daum 规则（通用启发式）
+const DAUM_RULES = {
+  ignoreExact: [
+    '본문 바로가기', '메뉴 바로가기', '바로가기', 'Daum 뉴스', '다음뉴스', 'Daum', '관련 서비스', '연예', '스포츠', '날씨', '메인메뉴', '홈',
+    '기후/환경', '사회', '경제', '정치', '국제', '문화', '생활', 'IT/과학', '인물', '지식/칼럼', '연재', '국제홈', '국제일반', '국제 일반',
+    '아시아/대양주', '미국/중남미', '유럽', '중동/아프리카', '해외화제', '실시간 트렌드', '자세히 보기', '더보기', '신규', '로그인', '로그아웃',
+    '검색', '광고', '설정', '닫기', '이전', '다음', '홈 화면 설정 팝업', '화면 스타일', '언론사', '구독', '구독하기', '뉴스 홈', '랭킹',
+    '배열이력', '팩트체크', '오늘의 숏', '전체', '이슈', '많이 본 뉴스', '뉴스홈',
+  ],
+  ignoreRe: [
+    /^실시간 트렌드/, /^(본문|메뉴)\s*바로가기/, /^\d+위[,.]?\s/, /^\d+$/, /^(오늘|어제)\s+\d{1,2}:\d{2}$/, /^자세히/, /하위메뉴$/, /^\d+\s*\/\s*\d+$/,
+    /^(댓글|공감)\s*\d*$/, /^\d{1,2}:\d{2}(:\d{2})?$/,
+  ],
+  counterRe: [/^\d+$/],
+  sections: [
+    [/주요\s*뉴스$/, 'headline'],
+    [/최신\s*뉴스$/, 'latest'],
+    [/연재\s*(기사|뉴스)$/, 'series'],
+  ],
+  stop: [/^기사배열\s*책임자/, /^©\s*(Daum|AXZ|Kakao)/i, /^뉴스 기사에 대한 저작권/, /^Copyright/i],
+  defaultSection: 'unknown',
+  splitBlocks: true,        // 按空行分块
+  pick: 'shortest',          // 媒体名前面的两行里，较短的作标题，较长的作摘要
+};
+
+// HTML 文件的选择器。找不到时自动退回到“按链接找条目”，再不行退回到文本解析。
+const HTML_SELECTORS = {
+  naver: {
+    item: 'li.sa_item, div.sa_item',
+    title: ['.sa_text_strong', 'a.sa_text_title', '.sa_text_title'],
+    link: ['a.sa_text_title', 'a.sa_thumb_link', 'a[href*="/article/"]'],
+    summary: ['.sa_text_lede'],
+    outlet: ['.sa_text_press'],
+    time: ['.sa_text_datetime b', '.sa_text_datetime'],
+    sectionClass: [[/headline/i, 'headline'], [/series|serial/i, 'series'], [/latest/i, 'latest']],
+    sectionText: [[/헤드라인/, 'headline'], [/연재/, 'series']],
+    articleHref: /(n\.news\.naver\.com\/(mnews\/)?article\/|news\.naver\.com\/(main\/read|article\/)|\/mnews\/article\/)/,
+    base: 'https://news.naver.com/',
+  },
+  daum: {
+    item: 'ul.list_newsheadline2 > li, ul.list_newsmajor > li, ul.list_news2 > li, ul.list_newsbasic > li, li.item_newsheadline2, li.item_news',
+    title: ['.tit_txt', 'strong.tit_g', '.tit_g', '.tit_news', 'strong'],
+    link: ['a[href*="v.daum.net/v/"]', 'a[href]'],
+    summary: ['.desc_txt', '.desc_news', 'p.desc', '.desc'],
+    outlet: ['.txt_info:first-child', '.info_cp', '.txt_cp'],
+    time: ['.txt_info:nth-child(2)', '.info_time', '.txt_time'],
+    sectionClass: [[/headline|major/i, 'headline'], [/latest|recent/i, 'latest'], [/series/i, 'series']],
+    sectionText: [[/주요\s*뉴스/, 'headline'], [/최신\s*뉴스/, 'latest'], [/연재/, 'series']],
+    articleHref: /v\.daum\.net\/v\/\w+/,
+    base: 'https://news.daum.net/',
+  },
+};
+
+const RULES = { naver: NAVER_RULES, daum: DAUM_RULES };
+const SECTION_NAMES = { headline: '头条', series: '连载', latest: '最新', unknown: '未分类' };
+const PORTAL_NAMES = { naver: 'Naver', daum: 'Daum' };
+const AI_INTRO = '以下为韩国门户网站国际新闻条目，请逐条与美国主流媒体报道核对事实、数字和标题措辞。';
+const STORE_KEY = 'headline-radar-portal-v1';
+
+/* =====================================================================
+   2. 小工具
+   ===================================================================== */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pad = (n) => String(n).padStart(2, '0');
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
+function seoulMs(y, mo, d, h, mi) { return Date.UTC(y, mo - 1, d, h - 9, mi); }
+function hour12(ampm, h) { if (ampm === '오후' && h < 12) return h + 12; if (ampm === '오전' && h === 12) return 0; return h; }
+function seoulParts(ms) { const d = new Date(ms + 9 * 36e5); return { y: d.getUTCFullYear(), mo: d.getUTCMonth() + 1, d: d.getUTCDate(), h: d.getUTCHours(), mi: d.getUTCMinutes() }; }
+function seoulISO(ms) { const p = seoulParts(ms); return `${p.y}-${pad(p.mo)}-${pad(p.d)}T${pad(p.h)}:${pad(p.mi)}:00+09:00`; }
+function fmtSeoul(iso, withYear) { const p = seoulParts(Date.parse(iso)); return (withYear ? p.y + '-' : '') + `${pad(p.mo)}-${pad(p.d)} ${pad(p.h)}:${pad(p.mi)}`; }
+const isRelative = (t) => !!t && TIME_RULES.some((r) => r.rel && r.re.test(t));
+
+function parseTime(text, now) {
+  const t = String(text || '').trim();
+  for (const r of TIME_RULES) {
+    const m = t.match(r.re);
+    if (!m) continue;
+    const ms = r.rel ? now - r.rel(m) : r.abs(m, now);
+    if (Number.isFinite(ms)) return seoulISO(ms);
+  }
+  return null;
+}
+
+function cleanLine(s) {
+  return String(s ?? '').replace(/[ ​‌‍﻿]/g, ' ').replace(/^[\s•·∙▶▷■□◆◇●○►]+/, '').replace(/[ \t]+$/, '').trim();
+}
+const squash = (s) => s.replace(/\s+/g, ' ').trim();
+const norm = (s) => String(s || '').toLowerCase().replace(/[\s\p{P}\p{S}]/gu, '');
+const OUTLET_SET = new Set(OUTLETS.map(norm));
+const stripOutlet = (s) => squash(s.replace(OUTLET_SUFFIX, ''));
+const looksLikeName = (s) => s.length >= 2 && s.length <= LIMITS.outletMax && !/^\d+$/.test(s) && !/["“”'‘’…?!,.。:;()\[\]=]/.test(s);
+
+/* =====================================================================
+   3. 文本解析
+   ===================================================================== */
+function prepRules(r) {
+  if (!r._set) r._set = new Set(r.ignoreExact);
+  return r;
+}
+function isIgnored(line, r) {
+  if (r._set.has(line) || r.ignoreRe.some((re) => re.test(line))) return true;
+  const toks = line.split(/\s{2,}|\t+|\s*\|\s*/).map((t) => t.trim()).filter(Boolean);
+  return toks.length > 1 && toks.every((t) => r._set.has(t));
+}
+const isCounter = (line, r) => r.counterRe.some((re) => re.test(line));
+function sectionMarker(line, r) { for (const [re, sec] of r.sections) if (re.test(line)) return sec; return null; }
+
+function nextMeaningful(lines, i, r) {
+  for (let j = i + 1; j < lines.length; j++) { const l = cleanLine(lines[j]); if (l) return l; }
+  return '';
+}
+function outletOf(line, lines, i, r, now) {
+  const name = stripOutlet(line);
+  if (OUTLET_SET.has(norm(name))) return name;
+  if (!looksLikeName(name)) return null;
+  const nx = nextMeaningful(lines, i, r);
+  return nx && (parseTime(nx, now) || isCounter(nx, r)) ? name : null;
+}
+function splitOutletTime(line) {
+  const m = line.match(OUTLET_TIME_TAIL);
+  if (!m || m.index === 0) return null;
+  const name = stripOutlet(line.slice(0, m.index));
+  if (!name || !(OUTLET_SET.has(norm(name)) || looksLikeName(name))) return null;
+  return { outlet: name, time: squash(m[1]) };
+}
+
+// 用一组行（媒体名之前积累的文字）组成一条新闻
+function buildItem(buf, rules) {
+  const lines = [], seen = new Set();
+  let dup = false;
+  for (const l of buf) { const k = norm(l); if (seen.has(k)) { dup = true; continue; } seen.add(k); lines.push(squash(l)); }
+  if (!lines.length) return null;
+  let title, summary = '', left;
+  const last = lines[lines.length - 1], prev = lines[lines.length - 2];
+  if (rules.pick === 'shortest' && prev) {
+    const [s, l] = prev.length <= last.length ? [prev, last] : [last, prev];
+    if (l.length >= LIMITS.summaryMin && s.length >= LIMITS.titleMin) { title = s; summary = l; left = lines.slice(0, -2); }
+    else { title = last; left = lines.slice(0, -1); }
+  } else if (prev && !dup && last.length >= LIMITS.summaryMin && prev.length >= LIMITS.titleMin && (last.length >= LIMITS.summaryLong || last.length > prev.length)) {
+    title = prev; summary = last; left = lines.slice(0, -2);
+  } else {
+    title = last; left = lines.slice(0, -1);
+  }
+  if (title.length < 2) return null;
+  return { title, summary, dup, left };
+}
+
+// 把一段段文字切成条目。blocks: string[][]，每块是若干行
+function segment(blocks, portal, now) {
+  const rules = prepRules(RULES[portal]);
+  const items = [], unknown = [];
+  let section = rules.defaultSection, stopped = false;
+  for (const lines of blocks) {
+    if (stopped) break;
+    let buf = [], last = null;
+    for (let i = 0; i < lines.length; i++) {
+      const line = cleanLine(lines[i]);
+      if (!line) continue;
+      if (rules.stop.some((re) => re.test(line))) { stopped = true; break; }
+      const sec = sectionMarker(line, rules);
+      if (sec !== null) {
+        // 进入连载区时，紧挨着的一行短文字是连载名（如“배틀라인”），不算未识别
+        if (sec === 'series' && buf.length && buf[buf.length - 1].length <= 15) buf.pop();
+        unknown.push(...buf); buf = []; last = null; section = sec; continue;
+      }
+      if (isIgnored(line, rules)) continue;
+      const t = parseTime(line, now);
+      if (t) {
+        if (last && !last.timeText) { last.timeText = squash(line); last.publishedAt = t; }
+        else unknown.push(line);
+        continue;
+      }
+      let outlet = null, timeText = null;
+      const comb = splitOutletTime(line);
+      if (comb) { outlet = comb.outlet; timeText = comb.time; }
+      else outlet = outletOf(line, lines, i, rules, now);
+      if (outlet) {
+        const b = buildItem(buf, rules);
+        buf = [];
+        if (!b) { unknown.push(line); last = null; continue; }
+        unknown.push(...b.left);
+        last = mkItem({ portal, section: b.dup ? 'series' : section, title: b.title, summary: b.summary, outlet, timeText, now });
+        items.push(last);
+        continue;
+      }
+      last = null;
+      buf.push(line);
+    }
+    unknown.push(...buf);
+  }
+  return { items, unknown };
+}
+
+function mkItem({ portal, section, title, summary, outlet, timeText, url, now }) {
+  const tt = timeText ? squash(timeText) : '';
+  return {
+    id: uid(), portal, section: section || 'unknown', title: squash(title || ''), summary: squash(summary || ''),
+    outlet: squash(outlet || ''), timeText: tt, publishedAt: tt ? parseTime(tt, now) : null, url: url || '', importedAt: new Date(now).toISOString(),
+  };
+}
+
+function parseText(text, portal, now) {
+  const rules = RULES[portal];
+  const t = String(text || '').replace(/\r\n?/g, '\n');
+  const blocks = rules.splitBlocks ? t.split(/\n[ \t ]*\n/).map((b) => b.split('\n')) : [t.split('\n')];
+  return segment(blocks, portal, now);
+}
+
+/* =====================================================================
+   4. HTML 解析
+   ===================================================================== */
+const BLOCK_TAGS = /^(ADDRESS|ARTICLE|ASIDE|BLOCKQUOTE|BR|DD|DIV|DL|DT|FIGCAPTION|FIGURE|FOOTER|FORM|H[1-6]|HEADER|HR|LI|MAIN|NAV|OL|P|PRE|SECTION|TABLE|TD|TH|TR|UL)$/;
+function domText(node) {
+  const out = [];
+  (function walk(n) {
+    if (n.nodeType === 3) { out.push(n.nodeValue.replace(/\s+/g, ' ')); return; }
+    if (n.nodeType !== 1 || /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE|SVG|IFRAME)$/i.test(n.tagName)) return;
+    const b = BLOCK_TAGS.test(n.tagName.toUpperCase());
+    if (b) out.push('\n');
+    for (const c of n.childNodes) walk(c);
+    if (b) out.push('\n');
+  })(node);
+  return out.join('').split('\n').map((l) => l.trim()).join('\n').replace(/\n{3,}/g, '\n\n');
+}
+function pickText(root, sels) { for (const s of sels) { const el = root.querySelector(s); const v = el && squash(el.textContent || ''); if (v) return v; } return ''; }
+function pickHref(root, sels, base) {
+  for (const s of sels) {
+    const el = root.matches && root.matches(s) ? root : root.querySelector(s);
+    const h = el && el.getAttribute('href');
+    if (h && !/^(javascript:|#)/i.test(h)) { try { return new URL(h, base).href; } catch (e) {} }
+  }
+  return '';
+}
+function sectionOfNode(node, S) {
+  for (let n = node, k = 0; n && n.nodeType === 1 && k < 10; n = n.parentElement, k++) {
+    const cls = typeof n.className === 'string' ? n.className : '';
+    for (const [re, sec] of S.sectionClass) if (re.test(cls)) return sec;
+    const heads = [...n.querySelectorAll(':scope > h2, :scope > h3, :scope > h4, :scope > header h2, :scope > header h3, :scope > div > h2, :scope > div > h3')];
+    for (let p = n.previousElementSibling, j = 0; p && j < 2; p = p.previousElementSibling, j++) if (/^H[2-4]$/.test(p.tagName)) heads.push(p);
+    for (const h of heads) for (const [re, sec] of S.sectionText) if (re.test(h.textContent || '')) return sec;
+  }
+  return 'unknown';
+}
+// 粘贴文本、.txt 文件：靠各门户页面特有的字样判断来源
+const TEXT_SIGNS = {
+  naver: [/뉴스스탠드/, /헤드라인 뉴스/, /AiRS/, /개의\s*관련뉴스/, /NAVER/, /네이버/],
+  daum: [/Daum\s*뉴스/, /주요\s*뉴스/, /최신\s*뉴스/, /AXZ/, /Daum Corp/i, /기사배열책임자/],
+};
+function detectPortalText(text) {
+  const a = TEXT_SIGNS.naver.filter((re) => re.test(text)).length, b = TEXT_SIGNS.daum.filter((re) => re.test(text)).length;
+  if (a >= 2 && a > b) return 'naver';
+  if (b >= 2 && b > a) return 'daum';
+  return null;
+}
+function parseTextAuto(text, portal, now) {
+  const detected = detectPortalText(text);
+  const p = detected || portal;
+  return { ...parseText(text, p, now), portal: p, detected };
+}
+function detectPortal(html) {
+  const a = (html.match(/naver\.(com|net)/g) || []).length, b = (html.match(/daum\.(net|com)|kakao/g) || []).length;
+  if (a > b * 3 && a >= 3) return 'naver';
+  if (b > a * 3 && b >= 3) return 'daum';
+  return null;
+}
+
+function parseHtml(html, portal, now) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  doc.querySelectorAll('script,style,noscript,template,svg,iframe').forEach((n) => n.remove());
+  const detected = detectPortal(html);
+  const p = detected || portal;
+  const S = HTML_SELECTORS[p];
+  let items = [], how = 'selectors';
+
+  // ① 按选择器取
+  for (const node of doc.querySelectorAll(S.item)) {
+    const title = pickText(node, S.title);
+    if (title.length < 2) continue;
+    let outlet = pickText(node, S.outlet), timeText = pickText(node, S.time);
+    const comb = outlet && splitOutletTime(outlet);
+    if (comb) { outlet = comb.outlet; timeText = timeText || comb.time; }
+    if (timeText && !parseTime(timeText, now)) { const c2 = splitOutletTime('x ' + timeText); timeText = c2 ? c2.time : timeText; }
+    items.push(mkItem({ portal: p, section: sectionOfNode(node, S), title, summary: pickText(node, S.summary), outlet, timeText, url: pickHref(node, S.link, S.base), now }));
+  }
+
+  // ② 选择器失效：按指向新闻正文的链接找条目
+  if (!items.length) {
+    how = 'links';
+    const seen = new Set();
+    for (const a of doc.querySelectorAll('a[href]')) {
+      let url; try { url = new URL(a.getAttribute('href'), S.base).href; } catch (e) { continue; }
+      if (!S.articleHref.test(url) || seen.has(url)) continue;
+      const box = a.closest('li, article') || a.parentElement;
+      if (!box) continue;
+      const seg = segment([domText(box).split('\n')], p, now);
+      let it = seg.items[0];
+      if (!it) {
+        const t = squash(a.textContent || '');
+        if (t.length < LIMITS.titleMin) continue;
+        it = mkItem({ portal: p, section: 'unknown', title: t, now });
+      }
+      seen.add(url);
+      it.url = url;
+      if (it.section === 'unknown') it.section = sectionOfNode(box, S);
+      items.push(it);
+    }
+  }
+
+  // ③ 还是没有：退回到整页文本解析
+  if (!items.length) {
+    how = 'text';
+    const r = parseText(domText(doc.body || doc.documentElement), p, now);
+    return { ...r, portal: p, detected, how };
+  }
+  return { items, unknown: [], portal: p, detected, how };
+}
+
+/* =====================================================================
+   5. 数据：去重、保存
+   ===================================================================== */
+const dupKey = (it) => norm(it.title) + '|' + norm(it.outlet);
+const FILL = ['summary', 'url', 'timeText', 'publishedAt'];
+function absorb(into, from) {
+  let changed = false;
+  for (const f of FILL) if (!into[f] && from[f]) { into[f] = from[f]; changed = true; }
+  if (into.section === 'unknown' && from.section !== 'unknown') { into.section = from.section; changed = true; }
+  return changed;
+}
+function dedupe(items) {
+  const map = new Map(), out = [];
+  for (const it of items) { const k = dupKey(it); const ex = map.get(k); if (ex) absorb(ex, it); else { map.set(k, it); out.push(it); } }
+  return out;
+}
+
+let DB = [];
+function load() {
+  try { const d = JSON.parse(localStorage.getItem(STORE_KEY) || '[]'); DB = Array.isArray(d) ? d.filter((x) => x && x.id && x.title) : []; } catch (e) { DB = []; }
+}
+function save() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(DB)); return true; }
+  catch (e) { toast('浏览器存储空间不够，最近的改动没能保存。可以先导出，再删掉一些条目。'); return false; }
+}
+const timeKey = (it) => (it.publishedAt ? Date.parse(it.publishedAt) : NaN);
+function sorted(arr) {
+  return [...arr].sort((a, b) => {
+    const ta = timeKey(a), tb = timeKey(b);
+    if (Number.isFinite(ta) && Number.isFinite(tb)) return tb - ta;
+    if (Number.isFinite(ta)) return -1;
+    if (Number.isFinite(tb)) return 1;
+    return String(b.importedAt).localeCompare(String(a.importedAt));
+  });
+}
+
+/* =====================================================================
+   6. 导入界面
+   ===================================================================== */
+let PORTAL = 'naver', MODE = 'paste', FILES = [], PV = null;
+const HOWTO = {
+  naver: ['打开 Naver 国际版块：news.naver.com/section/104', '按 Ctrl+A 全选、Ctrl+C 复制（Mac 用 ⌘）', '粘贴到上面的框里，点“解析”'],
+  daum: ['打开 Daum 国际版块：news.daum.net/global', '按 Ctrl+A 全选、Ctrl+C 复制（Mac 用 ⌘）', '粘贴到上面的框里，点“解析”'],
+};
+function setPortal(p) {
+  PORTAL = p;
+  for (const b of $$('#portalSeg button')) b.setAttribute('aria-pressed', b.dataset.portal === p);
+  $('#pasteText').placeholder = p === 'naver' ? '在这里粘贴 Naver 国际版块页面的全部文字' : '在这里粘贴 Daum 国际版块页面的全部文字';
+  $('#howto').innerHTML = HOWTO[p].map((s) => `<li>${esc(s)}</li>`).join('');
+}
+function setMode(m) {
+  MODE = m;
+  for (const b of $$('#modeSeg button')) b.setAttribute('aria-pressed', b.dataset.mode === m);
+  $('#pasteBox').hidden = m !== 'paste';
+  $('#fileBox').hidden = m !== 'file';
+  $('#parseNote').textContent = '';
+}
+
+async function readFile(f) {
+  const buf = await f.arrayBuffer();
+  const head = new TextDecoder('latin1').decode(buf.slice(0, 4096));
+  let cs = (head.match(/<meta[^>]+charset=["']?\s*([\w-]+)/i) || [])[1] || 'utf-8';
+  try { return new TextDecoder(cs.toLowerCase()).decode(buf); } catch (e) { return new TextDecoder('utf-8').decode(buf); }
+}
+function renderFiles() {
+  $('#fileList').innerHTML = FILES.map((f) => `<li><span>${esc(f.name)}</span><span class="note num">${(f.size / 1024).toFixed(0)} KB</span></li>`).join('');
+}
+
+async function doParse() {
+  const now = Date.now();
+  let items = [], unknown = [], fileNotes = [];
+  if (MODE === 'paste') {
+    const text = $('#pasteText').value;
+    if (!text.trim()) { $('#parseNote').textContent = '先把门户页面的文字粘贴进来。'; return; }
+    const r = /<\/?(html|body|div|li|a)\b/i.test(text) && /<\/(div|li|a)>/i.test(text) ? parseHtml(text, PORTAL, now) : parseTextAuto(text, PORTAL, now);
+    items = r.items; unknown = r.unknown;
+    if (r.detected && r.detected !== PORTAL) fileNotes.push(`粘贴的内容看起来来自 ${PORTAL_NAMES[r.detected]}，已按 ${PORTAL_NAMES[r.detected]} 解析。`);
+  } else {
+    if (!FILES.length) { $('#parseNote').textContent = '先选择要导入的文件。'; return; }
+    for (const f of FILES) {
+      let text;
+      try { text = await readFile(f); } catch (e) { fileNotes.push(`${f.name}：读取失败。`); continue; }
+      const isHtml = /\.html?$/i.test(f.name) || /^\s*<(!doctype|html)/i.test(text);
+      const r = isHtml ? parseHtml(text, PORTAL, now) : parseTextAuto(text, PORTAL, now);
+      items.push(...r.items); unknown.push(...r.unknown);
+      const how = !isHtml ? '按文本解析' : r.how === 'selectors' ? '按网页结构解析' : r.how === 'links' ? '网页结构有变化，改按新闻链接解析' : '网页结构认不出，改按文本解析';
+      fileNotes.push(`${f.name}：${PORTAL_NAMES[r.portal || PORTAL]}，${r.items.length} 条，${how}${r.detected && r.detected !== PORTAL ? '（自动识别了来源）' : ''}。`);
+    }
+  }
+  PV = { items: dedupe(items), unknown: unknown.map((t) => ({ id: uid(), text: t, outlet: '' })), notes: fileNotes, now };
+  renderPreview();
+  $('#pvPanel').hidden = false;
+  $('#parseNote').textContent = '';
+  $('#pvPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function itemMeta(it) {
+  const time = it.publishedAt ? `<span class="num">${fmtSeoul(it.publishedAt)}${isRelative(it.timeText) ? '（约）' : ''}</span>` : '<span>时间未知</span>';
+  return `<span class="portal">${PORTAL_NAMES[it.portal] || it.portal}</span><span class="tag ${it.section}">${SECTION_NAMES[it.section] || '未分类'}</span><span>${esc(it.outlet || '媒体未知')}</span>${time}${it.timeText ? `<span>原文 ${esc(it.timeText)}</span>` : ''}`;
+}
+function renderPreview() {
+  const c = { headline: 0, series: 0, latest: 0, unknown: 0 };
+  for (const it of PV.items) c[it.section] = (c[it.section] || 0) + 1;
+  $('#pvSummary').textContent = `${PV.items.length} 条（头条 ${c.headline}，连载 ${c.series}，最新 ${c.latest}，未分类 ${c.unknown}），未识别 ${PV.unknown.length} 行`;
+  $('#pvFiles').innerHTML = PV.notes.map((n) => `<p class="note" style="margin:0 0 6px">${esc(n)}</p>`).join('');
+  $('#pvItems').innerHTML = PV.items.length ? PV.items.map((it) => `<div class="pv" data-id="${it.id}"><div><div class="t" lang="ko">${esc(it.title)}</div>${it.summary ? `<p class="sum" lang="ko">${esc(it.summary)}</p>` : ''}<div class="m">${itemMeta(it)}</div></div><button class="x" data-act="pvdel" aria-label="移除这一条" title="移除这一条">×</button></div>`).join('')
+    : '<p class="note">没有解析出条目。确认“来源”选对了，或者看看下面的未识别行。</p>';
+  $('#pvUnkTitle').textContent = `未识别（${PV.unknown.length} 行）`;
+  $('#pvUnkWrap').hidden = !PV.unknown.length;
+  $('#pvUnknown').innerHTML = PV.unknown.map((u) => `<div class="unk" data-id="${u.id}"><textarea rows="${Math.min(4, Math.ceil(u.text.length / 34) || 1)}" lang="ko" aria-label="未识别的行">${esc(u.text)}</textarea>
+    <div class="ctl"><input type="text" list="outletList" placeholder="媒体名（可选）" aria-label="媒体名" value="${esc(u.outlet)}"><button class="btn small" data-act="promote">转为条目</button><button class="link danger" data-act="unkdel">删除</button></div></div>`).join('');
+  $('#confirmBtn').textContent = `加入列表（${PV.items.length} 条）`;
+  $('#confirmBtn').disabled = !PV.items.length;
+}
+
+$('#pvPanel').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-act]'); if (!b || !PV) return;
+  const act = b.dataset.act;
+  if (act === 'pvdel') { const id = b.closest('.pv').dataset.id; PV.items = PV.items.filter((x) => x.id !== id); renderPreview(); }
+  if (act === 'unkdel') { const id = b.closest('.unk').dataset.id; PV.unknown = PV.unknown.filter((x) => x.id !== id); renderPreview(); }
+  if (act === 'promote') {
+    const row = b.closest('.unk'), id = row.dataset.id;
+    const lines = row.querySelector('textarea').value.split('\n').map(cleanLine).filter(Boolean);
+    if (!lines.length) return;
+    const outlet = squash(row.querySelector('input').value);
+    PV.items.push(mkItem({ portal: PORTAL, section: 'unknown', title: lines[0], summary: lines.slice(1).join(' '), outlet, now: PV.now }));
+    PV.items = dedupe(PV.items);
+    PV.unknown = PV.unknown.filter((x) => x.id !== id);
+    renderPreview();
+  }
+});
+$('#pvUnknown').addEventListener('input', (e) => {
+  const row = e.target.closest('.unk'); if (!row || !PV) return;
+  const u = PV.unknown.find((x) => x.id === row.dataset.id); if (!u) return;
+  if (e.target.tagName === 'TEXTAREA') u.text = e.target.value; else u.outlet = e.target.value;
+});
+$('#unkClear').addEventListener('click', () => { if (PV) { PV.unknown = []; renderPreview(); } });
+$('#discardBtn').addEventListener('click', () => { PV = null; $('#pvPanel').hidden = true; });
+$('#confirmBtn').addEventListener('click', () => {
+  if (!PV || !PV.items.length) return;
+  const idx = new Map(DB.map((it) => [dupKey(it), it]));
+  let added = 0, dup = 0, filled = 0;
+  for (const it of PV.items) {
+    const ex = idx.get(dupKey(it));
+    if (ex) { dup++; if (absorb(ex, it)) filled++; }
+    else { DB.push(it); idx.set(dupKey(it), it); added++; }
+  }
+  save();
+  PV = null; $('#pvPanel').hidden = true;
+  if (MODE === 'paste') $('#pasteText').value = ''; else { FILES = []; $('#fileInput').value = ''; renderFiles(); }
+  renderAll();
+  toast(`已加入 ${added} 条` + (dup ? `，${dup} 条已在列表里，没有重复加入` + (filled ? `（其中 ${filled} 条补全了缺少的字段）` : '') : '') + '。');
+});
+
+$('#portalSeg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setPortal(b.dataset.portal); });
+$('#modeSeg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setMode(b.dataset.mode); });
+$('#fileInput').addEventListener('change', (e) => { FILES = [...e.target.files]; renderFiles(); });
+$('#parseBtn').addEventListener('click', () => { doParse().catch((err) => { $('#parseNote').textContent = '解析出错：' + err.message; }); });
+
+/* =====================================================================
+   7. 列表、筛选、编辑
+   ===================================================================== */
+const PICK = new Set();
+let EDITING = null, SCOPE = 'all', LAST_DELETED = null;
+
+function filtered() {
+  const p = $('#fPortal').value, o = $('#fOutlet').value, s = $('#fSection').value, q = $('#fQ').value.trim().toLowerCase();
+  return sorted(DB.filter((it) => (!p || it.portal === p) && (!o || it.outlet === o) && (!s || it.section === s) &&
+    (!q || (it.title + ' ' + it.summary + ' ' + it.outlet).toLowerCase().includes(q))));
+}
+function fillSelect(sel, opts, first) {
+  const el = $(sel), v = el.value;
+  el.innerHTML = `<option value="">${first}</option>` + opts.map(([val, label]) => `<option value="${esc(val)}">${esc(label)}</option>`).join('');
+  el.value = opts.some(([val]) => val === v) ? v : '';
+}
+function countBy(arr, f) { const m = new Map(); for (const x of arr) { const k = f(x); m.set(k, (m.get(k) || 0) + 1); } return [...m].sort((a, b) => b[1] - a[1]); }
+
+function renderAll() {
+  for (const id of [...PICK]) if (!DB.some((x) => x.id === id)) PICK.delete(id);
+  const outlets = countBy(DB, (x) => x.outlet || '');
+  fillSelect('#fOutlet', outlets.filter(([k]) => k).map(([k, n]) => [k, `${k}（${n}）`]), '全部媒体');
+  fillSelect('#fSection', Object.keys(SECTION_NAMES).filter((k) => DB.some((x) => x.section === k)).map((k) => [k, SECTION_NAMES[k]]), '全部栏目');
+  $('#outletList').innerHTML = outlets.filter(([k]) => k).map(([k]) => `<option value="${esc(k)}">`).join('');
+  renderList();
+}
+
+function renderList() {
+  const L = filtered();
+  $('#listNote').textContent = DB.length ? `共 ${DB.length} 条，显示 ${L.length} 条，已勾选 ${PICK.size} 条` : '';
+  $('#pickAll').checked = L.length > 0 && L.every((x) => PICK.has(x.id));
+  $('#pickAll').indeterminate = !$('#pickAll').checked && L.some((x) => PICK.has(x.id));
+  $('#list').innerHTML = !DB.length ? '<div class="empty">还没有条目。在“导入”里粘贴或上传门户页面，解析后点“加入列表”。</div>'
+    : !L.length ? '<div class="empty">没有符合筛选条件的条目，换个条件试试。</div>'
+    : L.map((it) => EDITING === it.id ? editRow(it) : viewRow(it)).join('');
+  renderStats(L);
+  renderScope();
+}
+function viewRow(it) {
+  const when = it.publishedAt ? `<span class="num">${fmtSeoul(it.publishedAt).replace(' ', '<br>')}</span>${isRelative(it.timeText) ? '<br><span class="u">约</span>' : ''}` : '<span class="u">时间未知</span>';
+  const title = it.url ? `<a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.title)}</a>` : esc(it.title);
+  return `<article class="item${PICK.has(it.id) ? ' picked' : ''}" data-id="${it.id}">
+    <input type="checkbox" class="pick" ${PICK.has(it.id) ? 'checked' : ''} aria-label="勾选这一条">
+    <div class="when">${when}</div>
+    <div class="main"><div class="t" lang="ko">${title}</div>${it.summary ? `<p class="sum" lang="ko">${esc(it.summary)}</p>` : ''}
+      <div class="m"><span class="portal">${PORTAL_NAMES[it.portal] || it.portal}</span><span class="tag ${it.section}">${SECTION_NAMES[it.section] || '未分类'}</span><span>${esc(it.outlet || '媒体未知')}</span>${it.timeText ? `<span>原文 ${esc(it.timeText)}</span>` : ''}</div></div>
+    <div class="ops"><button data-act="edit">编辑</button><button data-act="del">删除</button></div>
+  </article>`;
+}
+function editRow(it) {
+  const local = it.publishedAt ? (() => { const p = seoulParts(Date.parse(it.publishedAt)); return `${p.y}-${pad(p.mo)}-${pad(p.d)}T${pad(p.h)}:${pad(p.mi)}`; })() : '';
+  return `<article class="item" data-id="${it.id}"><span></span>
+    <form class="edit" data-act="save">
+      <label class="wide">标题<input type="text" name="title" required value="${esc(it.title)}" lang="ko"></label>
+      <label class="wide">摘要<textarea name="summary" rows="3" lang="ko">${esc(it.summary)}</textarea></label>
+      <label>媒体<input type="text" name="outlet" list="outletList" value="${esc(it.outlet)}"></label>
+      <label>栏目<select name="section">${Object.entries(SECTION_NAMES).map(([k, v]) => `<option value="${k}" ${k === it.section ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+      <label>发布时间（首尔时间，可留空）<input type="datetime-local" name="published" value="${local}"></label>
+      <label>原始时间文字<input type="text" name="timeText" value="${esc(it.timeText)}"></label>
+      <label class="wide">链接<input type="url" name="url" value="${esc(it.url)}" placeholder="https://"></label>
+      <div class="actions"><button class="btn primary small" type="submit">保存</button><button class="btn small" type="button" data-act="cancel">取消</button></div>
+    </form></article>`;
+}
+
+$('#list').addEventListener('change', (e) => {
+  if (!e.target.classList.contains('pick')) return;
+  const id = e.target.closest('.item').dataset.id;
+  if (e.target.checked) PICK.add(id); else PICK.delete(id);
+  e.target.closest('.item').classList.toggle('picked', e.target.checked);
+  renderScope();
+  const L = filtered();
+  $('#listNote').textContent = `共 ${DB.length} 条，显示 ${L.length} 条，已勾选 ${PICK.size} 条`;
+  $('#pickAll').checked = L.length > 0 && L.every((x) => PICK.has(x.id));
+  $('#pickAll').indeterminate = !$('#pickAll').checked && L.some((x) => PICK.has(x.id));
+});
+$('#list').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-act]'); if (!b) return;
+  const id = b.closest('.item').dataset.id, act = b.dataset.act;
+  if (act === 'edit') { EDITING = id; renderList(); const f = $(`.item[data-id="${id}"] input[name=title]`); if (f) f.focus(); }
+  if (act === 'cancel') { EDITING = null; renderList(); }
+  if (act === 'del') {
+    const i = DB.findIndex((x) => x.id === id); if (i < 0) return;
+    LAST_DELETED = [{ item: DB[i], index: i }];
+    DB.splice(i, 1); PICK.delete(id); save(); renderAll();
+    toast('已删除 1 条。', '撤销', undo);
+  }
+});
+$('#list').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const f = e.target, id = f.closest('.item').dataset.id, it = DB.find((x) => x.id === id); if (!it) return;
+  const v = (n) => squash(f.elements[n].value || '');
+  if (!v('title')) { f.elements.title.focus(); return; }
+  Object.assign(it, { title: v('title'), summary: v('summary'), outlet: v('outlet'), section: f.elements.section.value, timeText: v('timeText'), url: v('url') });
+  const pub = f.elements.published.value, before = f.elements.published.defaultValue;
+  it.publishedAt = pub ? pub + ':00+09:00' : null;
+  // 手动改了发布时间：原来的“20분전”已不是推算依据，清掉，免得仍标“约”
+  if (pub !== before && isRelative(it.timeText) && v('timeText') === squash(f.elements.timeText.defaultValue)) it.timeText = '';
+  EDITING = null; save(); renderAll();
+  toast('已保存。');
+});
+function undo() {
+  if (!LAST_DELETED) return;
+  for (const { item, index } of [...LAST_DELETED].sort((a, b) => a.index - b.index)) DB.splice(Math.min(index, DB.length), 0, item);
+  LAST_DELETED = null; save(); renderAll(); toast('已恢复。');
+}
+$('#pickAll').addEventListener('change', (e) => { for (const it of filtered()) e.target.checked ? PICK.add(it.id) : PICK.delete(it.id); renderList(); });
+$('#pickNone').addEventListener('click', () => { PICK.clear(); renderList(); });
+$('#delPicked').addEventListener('click', () => {
+  if (!PICK.size) { toast('还没有勾选条目。'); return; }
+  LAST_DELETED = DB.map((item, index) => ({ item, index })).filter((x) => PICK.has(x.item.id));
+  DB = DB.filter((x) => !PICK.has(x.id)); const n = PICK.size; PICK.clear(); save(); renderAll();
+  toast(`已删除 ${n} 条。`, '撤销', undo);
+});
+let clearArmed = null;
+$('#clearAll').addEventListener('click', (e) => {
+  if (!DB.length) return;
+  if (!clearArmed) { e.target.textContent = `再点一次，清空全部 ${DB.length} 条`; clearArmed = setTimeout(() => { clearArmed = null; e.target.textContent = '清空全部'; }, 4000); return; }
+  clearTimeout(clearArmed); clearArmed = null; e.target.textContent = '清空全部';
+  LAST_DELETED = DB.map((item, index) => ({ item, index }));
+  DB = []; PICK.clear(); EDITING = null; save(); renderAll();
+  toast('已清空。', '撤销', undo);
+});
+for (const id of ['#fPortal', '#fOutlet', '#fSection']) $(id).addEventListener('change', renderList);
+$('#fQ').addEventListener('input', renderList);
+
+/* =====================================================================
+   8. 统计
+   ===================================================================== */
+function bars(rows) {
+  const max = Math.max(1, ...rows.map((r) => r[1]));
+  return `<table><tbody>${rows.map(([k, n]) => `<tr><td class="k" title="${esc(k)}">${esc(k)}</td><td><div class="bar" style="width:${(n / max) * 100}%"></div></td><td class="n num">${n}</td></tr>`).join('')}</tbody></table>`;
+}
+function renderStats(L) {
+  const filteredView = L.length !== DB.length;
+  $('#stTotal').textContent = L.length;
+  const nv = L.filter((x) => x.portal === 'naver').length;
+  $('#stSplit').textContent = (L.length ? `Naver ${nv} 条，Daum ${L.length - nv} 条` : '') + (filteredView ? `（当前筛选，共 ${DB.length} 条）` : '');
+  const outlets = countBy(L, (x) => x.outlet || '媒体未知').slice(0, 10);
+  $('#stOutlets').innerHTML = outlets.length ? bars(outlets) : '<p class="note">暂无数据</p>';
+  const secs = Object.keys(SECTION_NAMES).map((k) => [SECTION_NAMES[k], L.filter((x) => x.section === k).length]).filter((r) => r[1]);
+  $('#stSections').innerHTML = secs.length ? bars(secs) : '<p class="note">暂无数据</p>';
+}
+
+/* =====================================================================
+   9. 导出
+   ===================================================================== */
+function exportItems() {
+  return sorted(SCOPE === 'picked' ? DB.filter((x) => PICK.has(x.id)) : DB);
+}
+function renderScope() {
+  const b = $$('#scopeSeg button');
+  b[0].textContent = `勾选的 ${PICK.size} 条`; b[1].textContent = `全部 ${DB.length} 条`;
+  for (const x of b) x.setAttribute('aria-pressed', x.dataset.scope === SCOPE);
+  const n = exportItems().length;
+  for (const x of $$('[data-copy],[data-dl]')) x.disabled = !n;
+  $('#exNote').textContent = !n ? (SCOPE === 'picked' ? '先在列表里勾选条目' : '列表里还没有条目') : '';
+  if ($('#peek').open) $('#peekText').value = n ? toAI(exportItems()) : '';
+}
+const FIELDS = ['id', 'portal', 'section', 'title', 'summary', 'outlet', 'timeText', 'publishedAt', 'url', 'importedAt'];
+function toJSON(items) { return JSON.stringify(items.map((it) => Object.fromEntries(FIELDS.map((f) => [f, it[f] ?? (f === 'publishedAt' ? null : '')]))), null, 2); }
+function toCSV(items) {
+  const q = (v) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const head = ['发布时间（首尔）', '门户', '栏目', '媒体', '标题', '摘要', '原始时间文字', '链接', '导入时间', 'ID'];
+  const rows = items.map((it) => [it.publishedAt ? fmtSeoul(it.publishedAt, true) : '', PORTAL_NAMES[it.portal] || it.portal, SECTION_NAMES[it.section] || '', it.outlet, it.title, it.summary, it.timeText, it.url, it.importedAt, it.id]);
+  return '﻿' + [head, ...rows].map((r) => r.map(q).join(',')).join('\r\n');
+}
+function aiTime(it) {
+  if (!it.publishedAt) return '时间未知';
+  return fmtSeoul(it.publishedAt, true) + ' 首尔时间' + (isRelative(it.timeText) ? `（按“${it.timeText}”推算）` : '');
+}
+function toAI(items) {
+  const out = [AI_INTRO, ''];
+  items.forEach((it, i) => {
+    out.push(`[${i + 1}] ${it.outlet || '媒体未知'}｜${aiTime(it)}｜${it.title}`);
+    out.push(`摘要：${it.summary || '（无）'}`);
+    if (it.url) out.push(`链接：${it.url}`);
+    out.push('');
+  });
+  return out.join('\n').trim() + '\n';
+}
+const FORMATS = {
+  ai: { make: toAI, ext: 'txt', mime: 'text/plain;charset=utf-8', name: '给AI核对' },
+  csv: { make: toCSV, ext: 'csv', mime: 'text/csv;charset=utf-8', name: '表格' },
+  json: { make: toJSON, ext: 'json', mime: 'application/json;charset=utf-8', name: '数据' },
+};
+function stamp() { const p = seoulParts(Date.now()); return `${p.y}${pad(p.mo)}${pad(p.d)}-${pad(p.h)}${pad(p.mi)}`; }
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch (e) {
+    const ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;left:-9999px;top:0';
+    document.body.appendChild(ta); ta.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (e2) {} ta.remove(); return ok;
+  }
+}
+function download(name, mime, text) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: mime })); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+$('#scopeSeg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { SCOPE = b.dataset.scope; renderScope(); } });
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-copy],[data-dl]'); if (!b) return;
+  const items = exportItems(); if (!items.length) return;
+  const key = b.dataset.copy || b.dataset.dl, F = FORMATS[key], text = F.make(items);
+  if (b.dataset.copy) toast((await copyText(text)) ? `已复制 ${items.length} 条。` : '浏览器不允许复制，请改用“下载”。');
+  else { download(`韩国门户新闻_${F.name}_${stamp()}.${F.ext}`, F.mime, text); toast(`已下载 ${items.length} 条。`); }
+});
+$('#peek').addEventListener('toggle', renderScope);
+
+/* =====================================================================
+   10. 提示条
+   ===================================================================== */
+let toastTimer = null;
+function toast(msg, actLabel, act) {
+  const t = $('#toast');
+  t.innerHTML = esc(msg) + (actLabel ? `<button type="button">${esc(actLabel)}</button>` : '');
+  if (actLabel) t.querySelector('button').onclick = () => { t.style.display = 'none'; act(); };
+  t.style.display = 'block';
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.style.display = 'none'; }, actLabel ? 7000 : 3500);
+}
+
+/* ===== 启动 ===== */
+load();
+setPortal('naver');
+setMode('paste');
+renderAll();
+window.addEventListener('storage', (e) => { if (e.key === STORE_KEY) { load(); renderAll(); } });
+</script>
+</body>
+</html>
